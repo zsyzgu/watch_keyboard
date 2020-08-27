@@ -2,7 +2,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import time
-import img2video
 import io
 import os
 import pygame
@@ -111,8 +110,8 @@ class Exp3(Exp):
         super().__init__()
 
     def update_hightlight(self):
-        hl_L_row = (self.tracker_L.camera_oy - self.tracker_L.palm_line) * 0.01
-        hl_R_row = (self.tracker_R.camera_oy - self.tracker_R.palm_line) * 0.01
+        hl_L_row = (self.tracker_L.camera_oy - self.tracker_L.palm_line) * 0.01-0.5
+        hl_R_row = (self.tracker_R.camera_oy - self.tracker_R.palm_line) * 0.01-0.5
         hl_L_col = None
         hl_R_col = None
         if self.tracker_L.fingertips[1][0] != -1:

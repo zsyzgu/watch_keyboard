@@ -26,10 +26,10 @@ def resize(img_array, align_mode):
     
     return img_array, (_width, _height)
 
-def to_mp4(img_array):
+def to_mp4(img_array, result_file = 'result.mp4'):
     fps = 30
     img_array, size = resize(img_array, 'largest')
-    out = cv2.VideoWriter('result.mp4', cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
+    out = cv2.VideoWriter(result_file, cv2.VideoWriter_fourcc(*'DIVX'), fps, size)
  
     N = len(img_array)
     for i in range(N):
@@ -46,7 +46,6 @@ def run(start, end):
         filename = path + str(id) + '.png'
         img = cv2.imread(filename)
         if img is None:
-            #print(filename + " is error!")
             continue
         img_array.append(img)
  

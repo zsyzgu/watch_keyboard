@@ -18,13 +18,14 @@ class FingerTracker: # 1280 * 960
         self.init_camera_para(camera_id)
     
     def init_fingertips(self):
-        self.THUMB_L_EDGE = 100 # the left most cols contain no finger
-        self.THUMB_R_EDGE = 250 # the left cols just belong to the thumb
+        self.THUMB_R_EDGE = 300 # the left cols just belong to the thumb
         self.TIP_HEIGHT = 12 # Deal with two recognized points on a fingertip
         self.TIP_WIDTH = 100 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
         self.SECOND_ROW_DELTA = 60 # The second row of the keyboard is x pixels lower than camera_Oy
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
+        self.MIN_PRESSURE = 0 # Min pressure in a contact
+        self.MIN_ENDPOINT_BRIGHTNESS = 0.75 # The endpoint should be bright enough when contacting
         self.finger_names = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinkie']
         self.fingertips = [[-1, -1]] * 5
         self.touchpoints = [[-1, -1]] * 5 # The lowest point when touching
@@ -95,7 +96,11 @@ class FingerTracker: # 1280 * 960
         return self.BRIGHTNESS_THRESHOLD
 
     def find_palm_line(self, image): # palm_line = the root of the middel finger
-        L_COL = int(0.5 * self.M)
+        if self.fingertips[2][0] != -1:
+            self.curr_middle_finger = self.fingertips[2]
+        [x, y] = self.curr_middle_finger # The tip of the middle finger
+
+        L_COL = max(x, int(0.5 * self.M))
         R_COL = int(0.8 * self.M)
         CHUNK = 30
         height = 0 # Find the lowest black pixel between fingers
@@ -109,20 +114,23 @@ class FingerTracker: # 1280 * 960
                 if np.count_nonzero(image[i,L_COL:R_COL]) != R_COL-L_COL:
                     height = i
                     break
-
-        if self.fingertips[2][0] != -1:
-            self.curr_middle_finger = self.fingertips[2]
-        [x, y] = self.curr_middle_finger # The tip of the middle finger
+        self.palm_height = height
 
         palm_line = self.palm_line
         
+        x = int((x + self.M//2) // 2)
         if x != -1:
-            arr = image[:,x]
-            N = len(arr)
-            for i in range(height+5, 0, -1):
-                if arr[i] < arr[i-1] and arr[i] <= arr[i+1] and arr[i] <= arr[i-20]-10 and arr[i] <= arr[i+20]-10: # The first dark region is the root
+            arr = image[:,x].copy()
+            lb = max(height - 200, 50)
+            ub = height + 20
+            max_diff = 0
+            peak = arr[lb]
+            for i in range(lb,ub):
+                if arr[i] > arr[i-1]:
+                    peak = arr[i]
+                elif peak - arr[i] > max_diff:
+                    max_diff = peak - arr[i]
                     palm_line = i
-                    break
 
         return palm_line
 
@@ -142,7 +150,7 @@ class FingerTracker: # 1280 * 960
             point_num = len(X)
 
             for i in range(radius + 1, point_num - radius - 1): # Find peaks
-                if (X[i] >= self.THUMB_L_EDGE and Y[i] > Y[i - 1] and Y[i] >= Y[i + 1] and Y[i] == np.max(Y[i - radius: i + radius + 1])):
+                if (Y[i] > Y[i - 1] and Y[i] >= Y[i + 1] and Y[i] == np.max(Y[i - radius: i + radius + 1])):
                     ids.append(i)
 
             for i in range(1, len(ids)): # Unify peaks on the same finger
@@ -206,6 +214,8 @@ class FingerTracker: # 1280 * 960
 
         i = self.M//2-1
         j = self.N-1-np.argmin(A[::-1,i])
+
+        self.pressure = A[j,i]
 
         touch_line = np.zeros(self.M)
         while (i > 0):
@@ -279,7 +289,11 @@ class FingerTracker: # 1280 * 960
                 if self.fingertips[i][0] != -1:
                     x, y = self.fingertips[i][0], self.fingertips[i][1]
                     if y+3 >= touch_line[x]:
-                        self.is_touch[i] = True
+                        y=int(touch_line[x])
+                        gray_line = cv2.cvtColor(self.image[y-10:y+10,x:x+1], cv2.COLOR_RGB2GRAY)
+                        endpoint_brightness = float(np.min(gray_line)) / np.max(gray_line)
+                        if endpoint_brightness >= self.MIN_ENDPOINT_BRIGHTNESS:
+                            self.is_touch[i] = True
         
         for i in range(5):
             if self.fingertips[i][0] != -1:
@@ -319,6 +333,7 @@ class FingerTracker: # 1280 * 960
                 self.endpoints[i] = [-1,-1]
 
     def run(self, image):
+        self.image = image
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         self.N, self.M = gray.shape
         brightness_threshold = self.find_brightness_threshold(gray)
@@ -330,8 +345,8 @@ class FingerTracker: # 1280 * 960
         touch_line = None
         if len(table_contour) != 0:
             if np.min(table_contour[:, :, 1]) <= self.PALM_THRESHOLD: # Table connect with fingers
-                is_tapping = True
                 touch_line = self.find_touch_line(gray, brightness_threshold) # Also remove the table
+                is_tapping = self.pressure >= self.MIN_PRESSURE
             else:
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED)
 
@@ -347,7 +362,6 @@ class FingerTracker: # 1280 * 960
 
         # Save intermediate result
         self.illustration = gray
-        self.image = image
         if is_tapping:
             self.is_tapping = True
             self.touch_line = touch_line
@@ -377,8 +391,7 @@ class FingerTracker: # 1280 * 960
         cv2.line(result, (self.camera_ox//4, 0), (self.camera_ox//4, self.N//4 - 1), (64,64,64), 1)
         cv2.line(result, (0, (self.camera_oy+self.SECOND_ROW_DELTA)//4), (self.M//4 - 1, (self.camera_oy+self.SECOND_ROW_DELTA)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
-        #cv2.line(result, (0, (self.camera_oy-200)//4), (self.M//4 - 1, (self.camera_oy-200)//4), (0,64,0), 1)
-        #cv2.line(result, (0, (self.camera_oy-300)//4), (self.M//4 - 1, (self.camera_oy-300)//4), (0,64,0), 1)
+        cv2.line(result, (0, self.palm_height//4), (self.M//4 - 1, self.palm_height//4), (0,0,64), 1)
         #image = cv2.resize(self.image, (640, 380))
         #output = np.hstack([image, result])
 
