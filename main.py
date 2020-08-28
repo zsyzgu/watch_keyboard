@@ -19,7 +19,7 @@ if __name__ == "__main__":
     camera = cv2.VideoCapture(0)
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
-    [map1, map2, _] = pickle.load(open('1.calib', 'rb'))
+    [map1, map2, _, _] = pickle.load(open('1.calib', 'rb'))
 
     tracker = FingerTracker(1)
 

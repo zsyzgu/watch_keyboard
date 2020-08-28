@@ -24,8 +24,8 @@ class Exp:
         self.camera_R = cv2.VideoCapture(1)
         self.camera_R.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera_R.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
-        [self.map1_L, self.map2_L, _] = pickle.load(open('1.calib', 'rb'))
-        [self.map1_R, self.map2_R, _] = pickle.load(open('2.calib', 'rb'))
+        [self.map1_L, self.map2_L, _, _] = pickle.load(open('1.calib', 'rb'))
+        [self.map1_R, self.map2_R, _, _] = pickle.load(open('2.calib', 'rb'))
     
     def acquire_frame(self):
         succ_L, frame_L = self.camera_L.read()
@@ -47,77 +47,55 @@ class Exp:
 
 def calc_letter(side, index, keyboard):
     if side == 'L':
+        row = max(0,min(2,int(round(keyboard.hl_L_row - 1))))
         if index == 1:
             if keyboard.hl_L_col >= 1.5:
-                if keyboard.hl_L_row >= 2.5:
-                    return 'b'
-                if keyboard.hl_L_row >= 1.5:
-                    return 'g'
-                return 't'
+                col = 4
             else:
-                if keyboard.hl_L_row >= 2.5:
-                    return 'v'
-                if keyboard.hl_L_row >= 1.5:
-                    return 'f'
-                return 'r'
-        if index == 2:
-            if keyboard.hl_L_row >= 2.5:
-                return 'c'
-            if keyboard.hl_L_row >= 1.5:
-                return 'd'
-            return 'e'
-        if index == 3:
-            if keyboard.hl_L_row >= 2.5:
-                return 'x'
-            if keyboard.hl_L_row >= 1.5:
-                return 's'
-            return 'w'
-        if index == 4:
-            if keyboard.hl_L_row >= 2.5:
-                return 'z'
-            if keyboard.hl_L_row >= 1.5:
-                return 'a'
-            return 'q'
-    else:
+                col = 3
+        else:
+            col = 4 - index
+    if side == 'R':
+        row = max(0,min(2,int(round(keyboard.hl_R_row - 1))))
         if index == 1:
             if keyboard.hl_R_col >= 1.5:
-                if keyboard.hl_R_row >= 2.5:
-                    return 'n'
-                if keyboard.hl_R_row >= 1.5:
-                    return 'h'
-                return 'y'
+                col = 5
             else:
-                if keyboard.hl_R_row >= 2.5:
-                    return 'm'
-                if keyboard.hl_R_row >= 1.5:
-                    return 'j'
-                return 'u'
-        if index == 2:
-            if keyboard.hl_R_row >= 1.5:
-                return 'k'
-            return 'i'
-        if index == 3:
-            if keyboard.hl_R_row >= 1.5:
-                return 'l'
-            return 'o'
-        if index == 4:
-            if keyboard.hl_R_row >= 1.5:
-                return '-'
-            return 'p'
+                col = 6
+        else:
+            col = 5 + index
+    
+    for i in range(26):
+        [c, r] = keyboard.letter_positions[i]
+        if row == r and col == c:
+            return chr(ord('a') + i)
+    
+    if row == 2 and col == 7:
+        return 'k'
+    if row == 2 and col == 8:
+        return 'l'
+    if (row == 1 and col == 9) or (row == 2 and col == 9):
+        return '-'
+
+    return '#'
 
 class Exp3(Exp):
     def __init__(self):
         super().__init__()
 
     def update_hightlight(self):
-        hl_L_row = (self.tracker_L.camera_oy - self.tracker_L.palm_line) * 0.01-0.5
-        hl_R_row = (self.tracker_R.camera_oy - self.tracker_R.palm_line) * 0.01-0.5
+        hl_L_row = (self.tracker_L.cy - self.tracker_L.palm_line) * 0.01-0.5
+        hl_R_row = (self.tracker_R.cy - self.tracker_R.palm_line) * 0.01-0.5
         hl_L_col = None
         hl_R_col = None
         if self.tracker_L.fingertips[1][0] != -1:
-            hl_L_col = float(self.tracker_L.fingertips[1][0] - self.tracker_L.camera_ox + 25) / (-50)
+            hl_L_col = float(self.tracker_L.fingertips[1][0] - self.tracker_L.cx + 25) / (-50)
+            # A Trick
+            hl_L_col = hl_L_col + 1.5 - (hl_L_row * 0.71 + 0.26)
         if self.tracker_R.fingertips[1][0] != -1:
-            hl_R_col = float(self.tracker_R.fingertips[1][0] - self.tracker_R.camera_ox + 25) / (-50)
+            hl_R_col = float(self.tracker_R.fingertips[1][0] - self.tracker_R.cx + 25) / (-50)
+            # A Trick
+            hl_R_col = hl_R_col + 1.5 - (hl_R_row * 0.71 + 0.26)
         self.keyboard.update_hightlight(hl_L_row, hl_L_col, hl_R_row, hl_R_col)
         self.keyboard.draw()
 

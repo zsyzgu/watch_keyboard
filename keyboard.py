@@ -3,11 +3,14 @@ import numpy as np
 import time
 import random
 import pygame
+import math
 
 class Keyboard:
     GRID = 50
     
     def __init__(self):
+        self.VISABLE_FEEDBACK = False
+        self.WORD_CORRECTION = True
         self.init_letter_positions()
         self.init_task_list('phrases.txt')
         self.inputted_text = ''
@@ -16,6 +19,16 @@ class Keyboard:
     
     def init_candidates(self):
         self.candidates = ['' for i in range(5)]
+        if self.WORD_CORRECTION:
+            self.corpus = []
+            lines = open('corpus.txt').readlines()
+            CORPUS_AMOUNT = 20000
+            for i in range(CORPUS_AMOUNT):
+                line = lines[i]
+                tags = line.strip().split(' ')
+                word = tags[0]
+                pri = int(tags[1])
+                self.corpus.append((word, pri))
 
     def init_letter_positions(self):
         QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
@@ -95,22 +108,23 @@ class Keyboard:
             cv2.putText(image, ch, (int(pos[0] * GRID) + 15, int((pos[1] + 3) * GRID) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
         # Hightlight Row
-        if self.hl_L_row != None:
-            row = max(0.5, min(3.5, self.hl_L_row))
-            row_pixel = int((row - 0.5 + 2) * GRID)
-            image[row_pixel-2:row_pixel+3,:5*GRID] *= 2
-        if self.hl_R_row != None:
-            row = max(0.5, min(3.5, self.hl_R_row))
-            row_pixel = int((row - 0.5 + 2) * GRID)
-            image[row_pixel-2:row_pixel+3,5*GRID:] *= 2
-        if self.hl_L_col != None:
-            col = max(0.5, min(2.5, self.hl_L_col))
-            col_pixel = int((2.5 + col) * GRID)
-            image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
-        if self.hl_R_col != None:
-            col = max(0.5, min(2.5, self.hl_R_col))
-            col_pixel = int((7.5 - col) * GRID)
-            image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
+        if self.VISABLE_FEEDBACK:
+            if self.hl_L_row != None:
+                row = max(0.5, min(3.5, self.hl_L_row))
+                row_pixel = int((row - 0.5 + 2) * GRID)
+                image[row_pixel-2:row_pixel+3,:5*GRID] *= 2
+            if self.hl_R_row != None:
+                row = max(0.5, min(3.5, self.hl_R_row))
+                row_pixel = int((row - 0.5 + 2) * GRID)
+                image[row_pixel-2:row_pixel+3,5*GRID:] *= 2
+            if self.hl_L_col != None:
+                col = max(0.5, min(2.5, self.hl_L_col))
+                col_pixel = int((2.5 + col) * GRID)
+                image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
+            if self.hl_R_col != None:
+                col = max(0.5, min(2.5, self.hl_R_col))
+                col_pixel = int((7.5 - col) * GRID)
+                image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
 
         pg_img = pygame.surfarray.make_surface(cv2.transpose(image))
         self.screen.blit(pg_img, (0,0))
@@ -155,6 +169,13 @@ class Keyboard:
     def enter_a_space(self):
         i = len(self.inputted_text)
         task = self.task_list[self.curr_task_id]
+        if self.WORD_CORRECTION and (i >= len(task) - 1 or task[i] == ' '):
+            tags = self.inputted_text.split(' ')
+            if len(tags) > 0 and len(tags[-1]) > 0:
+                word = tags[-1]
+                word = self.word_correction(word)
+                tags[-1] = word
+                self.inputted_text = ' '.join(tags)
         if i < len(task) and task[i] == ' ':
             self.inputted_text += ' '
     
@@ -180,3 +201,28 @@ class Keyboard:
     def update_candidates(self, candidates):
         self.candidates = candidates.copy()
 
+    def word_correction(self, word):
+        positions = []
+        for letter in word:
+            index = ord(letter) - ord('a')
+            positions.append(self.letter_positions[index])
+        
+        N = len(self.corpus)
+        max_pri = 0
+        best_candidate = word
+        for i in range(N):
+            (candidate, pri) = self.corpus[i]
+            if len(candidate) == len(word):
+                for j in range(len(word)):
+                    letter = candidate[j]
+                    index = ord(letter) - ord('a')
+                    position = self.letter_positions[index]
+                    dx = position[0] - positions[j][0]
+                    dy = position[1] - positions[j][1]
+                    pri *= math.exp(-((2*dx)**2+(2*dy)**2))
+                if pri > max_pri:
+                    max_pri = pri
+                    best_candidate = candidate
+        
+        return best_candidate
+            

@@ -22,13 +22,12 @@ class FingerTracker: # 1280 * 960
         self.TIP_HEIGHT = 12 # Deal with two recognized points on a fingertip
         self.TIP_WIDTH = 100 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
-        self.SECOND_ROW_DELTA = 60 # The second row of the keyboard is x pixels lower than camera_Oy
+        self.SECOND_ROW_DELTA = 60 # The second row of the keyboard is x pixels lower than camera_cy
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
         self.MIN_PRESSURE = 0 # Min pressure in a contact
-        self.MIN_ENDPOINT_BRIGHTNESS = 0.75 # The endpoint should be bright enough when contacting
+        self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.finger_names = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinkie']
         self.fingertips = [[-1, -1]] * 5
-        self.touchpoints = [[-1, -1]] * 5 # The lowest point when touching
         self.endpoints = [[-1,-1]] * 5 # endpoint on the desk calned by touchpoint
         self.is_touch = [False for i in range(5)]
         self.is_touch_down = [False for i in range(5)]
@@ -38,17 +37,17 @@ class FingerTracker: # 1280 * 960
 
     def init_camera_para(self, camera_id):
         self.camera_id = camera_id
-        self.camera_theta_x = 108.0
-        self.camera_theta_y = 77.0
         self.camera_H = 0.75
         if camera_id == 1:
-            self.camera_ox = 640
-            self.camera_oy = 460
-            self.camera_rotate = 0 # Clockwise
+            self.fx = 411.58
+            self.fy = 412.05
+            self.cx = 637.29
+            self.cy = 463.37
         elif camera_id == 2:
-            self.camera_ox = 640
-            self.camera_oy = 460
-            self.camera_rotate = 0
+            self.fx = 391.87
+            self.fy = 393.57
+            self.cx = 673.29
+            self.cy = 452.71
         else:
             print('Camera ID Error.')
 
@@ -81,7 +80,7 @@ class FingerTracker: # 1280 * 960
 
     def find_brightness_threshold(self, image):
         if self.FIXED_BRIGHTNESS:
-            return 52
+            return 55
 
         palm_image = image[:self.N//2,:]
 
@@ -105,12 +104,12 @@ class FingerTracker: # 1280 * 960
         CHUNK = 30
         height = 0 # Find the lowest black pixel between fingers
         chunk = -1
-        for i in range(100, self.camera_oy, CHUNK):
+        for i in range(100, int(self.cy), CHUNK):
             if np.count_nonzero(image[i:i+CHUNK,L_COL:R_COL]) != (R_COL-L_COL)*CHUNK:
                 chunk = i
                 break
         if chunk != -1:
-            for i in range(chunk, self.camera_oy):
+            for i in range(chunk, int(self.cy)):
                 if np.count_nonzero(image[i,L_COL:R_COL]) != R_COL-L_COL:
                     height = i
                     break
@@ -245,10 +244,10 @@ class FingerTracker: # 1280 * 960
         elif len(fingertips) == 4 and self.has_thumb == False: # No thumb
             self.fingertips[0] = [-1, -1]
             self.fingertips[1:] = fingertips.copy()
-        elif len(fingertips) == 4 and fingertips[-1][0] <= self.camera_ox + 100: # No pinkie
+        elif len(fingertips) == 4 and fingertips[-1][0] <= self.cx + 100: # No pinkie
             self.fingertips[:-1] = fingertips.copy()
             self.fingertips[-1] = [-1, -1]
-        elif len(fingertips) == 3 and self.has_thumb == False and fingertips[-1][0] <= self.camera_ox + 100: # No thumb and pinkie
+        elif len(fingertips) == 3 and self.has_thumb == False and fingertips[-1][0] <= self.cx + 100: # No thumb and pinkie
             self.fingertips[0] = [-1, -1]
             self.fingertips[1:-1] = fingertips.copy()
             self.fingertips[-1] = [-1, -1]
@@ -283,11 +282,11 @@ class FingerTracker: # 1280 * 960
         
         if self.fingertips[0][0] != -1: # The thumb
             x, y = self.fingertips[0][0], self.fingertips[0][1]
-            self.is_touch[0] = (y >= self.camera_oy + self.SECOND_ROW_DELTA)
+            self.is_touch[0] = (y >= self.cy + self.SECOND_ROW_DELTA)
         if is_tapping:
             for i in range(1, 5): # Not the thumb
                 if self.fingertips[i][0] != -1:
-                    x, y = self.fingertips[i][0], self.fingertips[i][1]
+                    [x, y] = self.fingertips[i]
                     if y+3 >= touch_line[x]:
                         y=int(touch_line[x])
                         gray_line = cv2.cvtColor(self.image[y-10:y+10,x:x+1], cv2.COLOR_RGB2GRAY)
@@ -302,35 +301,15 @@ class FingerTracker: # 1280 * 960
     
     def calc_endpoints(self):
         for i in range(5):
-            if self.is_touch_down[i]:
-                self.touchpoints[i] = self.fingertips[i].copy()
-            elif self.is_touch[i]:
-                if self.fingertips[i][1] > self.touchpoints[i][1]:
-                    self.touchpoints[i] = self.fingertips[i].copy()
-
-        for i in range(5):
-            if self.is_touch_up[i]:
-                x = self.touchpoints[i][0]
-                y = self.touchpoints[i][1]
-                ox = self.camera_ox
-                oy = self.camera_oy
-                dx = x - ox
-                dy = y - oy
-                R = self.camera_rotate * math.pi / 180.0
-                rx = dx * math.cos(R) - dy * math.sin(R)
-                ry = dx * math.sin(R) + dy * math.cos(R)
-                fx = rx / (self.M // 2)
-                fy = ry / (self.N // 2)
-                H = self.camera_H
-                theta_x = self.camera_theta_x * math.pi / 180.0
-                theta_y = self.camera_theta_y * math.pi / 180.0
-                
-                endpoint_y = H / (math.tan(theta_y / 2) * fy)
-                endpoint_x = endpoint_y * (math.tan(theta_x / 2) * fx)
-
-                self.endpoints[i] = [endpoint_x, endpoint_y]
+            if self.is_touch[i]:
+                [X, Y] = self.fingertips[i]
+                offset = (self.cy - Y) / (self.camera_H * self.fy / 80.0 + 1) # (80.0 = 8 * 10) Offset is -8 pixels when z = 10 cm
+                Y += offset
+                z = (self.camera_H * self.fy) / (Y - self.cy)
+                x = (X - self.cx) / self.fx * z
+                self.endpoints[i] = [x, z]
             else:
-                self.endpoints[i] = [-1,-1]
+                self.endpoints[i] = [-1, -1]
 
     def run(self, image):
         self.image = image
@@ -388,8 +367,8 @@ class FingerTracker: # 1280 * 960
 
         cv2.putText(result, title, tuple([0, 100]), 0, 1.2, (0,0,255), 3)
         result = cv2.resize(result, (320, 240))
-        cv2.line(result, (self.camera_ox//4, 0), (self.camera_ox//4, self.N//4 - 1), (64,64,64), 1)
-        cv2.line(result, (0, (self.camera_oy+self.SECOND_ROW_DELTA)//4), (self.M//4 - 1, (self.camera_oy+self.SECOND_ROW_DELTA)//4), (64,64,64), 1)
+        cv2.line(result, (int(self.cx)//4, 0), (int(self.cx)//4, self.N//4 - 1), (64,64,64), 1)
+        cv2.line(result, (0, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (self.M//4 - 1, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
         cv2.line(result, (0, self.palm_height//4), (self.M//4 - 1, self.palm_height//4), (0,0,64), 1)
         #image = cv2.resize(self.image, (640, 380))
