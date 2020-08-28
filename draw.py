@@ -19,7 +19,6 @@ if __name__ == "__main__":
         succ, frame = camera.read()
         if succ == False:
             break
-        frame = cv2.remap(frame,map1,map2,cv2.INTER_LINEAR,borderValue=cv2.BORDER_CONSTANT)
         tracker.run(frame)
         output = tracker.output()
         cv2.imshow('i',output)

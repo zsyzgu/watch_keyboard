@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time
 import io
 import math
+import pickle
 from scipy.stats import kurtosis
 
 class FingerTracker: # 1280 * 960
@@ -37,19 +38,12 @@ class FingerTracker: # 1280 * 960
 
     def init_camera_para(self, camera_id):
         self.camera_id = camera_id
+        [self.map1, self.map2, self.roi, self.camera_mtx] = pickle.load(open(str(camera_id) + '.calib', 'rb'))
         self.camera_H = 0.75
-        if camera_id == 1:
-            self.fx = 411.58
-            self.fy = 412.05
-            self.cx = 637.29
-            self.cy = 463.37
-        elif camera_id == 2:
-            self.fx = 391.87
-            self.fy = 393.57
-            self.cx = 673.29
-            self.cy = 452.71
-        else:
-            print('Camera ID Error.')
+        self.fx = self.camera_mtx[0][0]
+        self.fy = self.camera_mtx[1][1]
+        self.cx = self.camera_mtx[0][2]
+        self.cy = self.camera_mtx[1][2]
 
     def find_contours(self, frame, threshold, hier):
         _, binary = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
@@ -312,6 +306,10 @@ class FingerTracker: # 1280 * 960
                 self.endpoints[i] = [-1, -1]
 
     def run(self, image):
+        image = cv2.remap(image,self.map1,self.map2,cv2.INTER_LINEAR,borderValue=cv2.BORDER_CONSTANT) # deal with distortion
+        if self.camera_id == 1:
+            image = cv2.flip(image, 1)
+        
         self.image = image
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         self.N, self.M = gray.shape
@@ -371,6 +369,8 @@ class FingerTracker: # 1280 * 960
         cv2.line(result, (0, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (self.M//4 - 1, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
         cv2.line(result, (0, self.palm_height//4), (self.M//4 - 1, self.palm_height//4), (0,0,64), 1)
+        if self.camera_id == 1:
+            result = cv2.flip(result, 1)
         #image = cv2.resize(self.image, (640, 380))
         #output = np.hstack([image, result])
 

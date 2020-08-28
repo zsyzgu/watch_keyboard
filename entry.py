@@ -24,16 +24,11 @@ class Exp:
         self.camera_R = cv2.VideoCapture(1)
         self.camera_R.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.camera_R.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)
-        [self.map1_L, self.map2_L, _, _] = pickle.load(open('1.calib', 'rb'))
-        [self.map1_R, self.map2_R, _, _] = pickle.load(open('2.calib', 'rb'))
     
     def acquire_frame(self):
         succ_L, frame_L = self.camera_L.read()
         succ_R, frame_R = self.camera_R.read()
         if succ_L and succ_R:
-            frame_L = cv2.remap(frame_L, self.map1_L, self.map2_L,cv2.INTER_LINEAR,borderValue=cv2.BORDER_CONSTANT)
-            frame_R = cv2.remap(frame_R, self.map1_R, self.map2_R,cv2.INTER_LINEAR,borderValue=cv2.BORDER_CONSTANT)
-            frame_L = cv2.flip(frame_L, 1)
             return True, frame_L, frame_R
         else:
             return False, None, None
@@ -113,7 +108,6 @@ class Exp3(Exp):
 
             if is_illustration:
                 output_L = self.tracker_L.output()
-                output_L = cv2.flip(output_L, 1)
                 output_R = self.tracker_R.output()
                 output = np.hstack([output_L, output_R])
                 cv2.imshow('illustration', output)
