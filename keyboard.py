@@ -9,8 +9,8 @@ class Keyboard:
     GRID = 50
     
     def __init__(self):
-        self.VISABLE_FEEDBACK = True
-        self.WORD_CORRECTION = True
+        self.VISABLE_FEEDBACK = False
+        self.WORD_CORRECTION = False
         self.init_letter_positions()
         self.init_task_list('phrases.txt')
         self.inputted_text = ''

@@ -92,7 +92,8 @@ class Exp3(Exp):
             # A Trick
             hl_R_col = hl_R_col + 1.5 - (hl_R_row * 0.71 + 0.26)
         self.keyboard.update_hightlight(hl_L_row, hl_L_col, hl_R_row, hl_R_col)
-        self.keyboard.draw()
+        if self.keyboard.VISABLE_FEEDBACK:
+            self.keyboard.draw()
 
     def run(self):
         self.keyboard.draw()
@@ -118,6 +119,7 @@ class Exp3(Exp):
             keys = self.get_keyboard_events()
             if self.tracker_R.is_touch_down[0] or pygame.K_SPACE in keys: # Entry a space
                 self.keyboard.enter_a_space()
+                self.keyboard.draw()
             if (True in self.tracker_L.is_touch_down[1 : 5]) or (True in self.tracker_R.is_touch_down[1 : 5]): # Entry a letter
                 for i in range(1, 5):
                     if self.tracker_L.is_touch_down[i]:
@@ -135,8 +137,10 @@ class Exp3(Exp):
                 letter = calc_letter(side, index, self.keyboard)
                 if letter != '-':
                     self.keyboard.enter_a_letter(letter)
+                    self.keyboard.draw()
                 else:
                     self.keyboard.delete_a_letter()
+                    self.keyboard.draw()
             if pygame.K_i in keys: # open/close illustration
                 is_illustration ^= True
                 if is_illustration == False:
@@ -148,8 +152,10 @@ class Exp3(Exp):
                     succ = self.keyboard.next_phrase()
                     if not succ:
                         is_running = False
+                    self.keyboard.draw()
             if pygame.K_r in keys: # Redo phrase
                 self.keyboard.redo_phrase()
+                self.keyboard.draw()
 
 if __name__ == "__main__":
     exp = Exp3()
