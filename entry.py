@@ -84,11 +84,11 @@ class Exp3(Exp):
         hl_L_col = None
         hl_R_col = None
         if self.tracker_L.fingertips[1][0] != -1:
-            hl_L_col = float(self.tracker_L.fingertips[1][0] - self.tracker_L.cx + 25) / (-50)
+            hl_L_col = float(self.tracker_L.fingertips[1][0] - self.tracker_L.cx) / (+50) - 0.5
             # A Trick
             hl_L_col = hl_L_col + 1.5 - (hl_L_row * 0.71 + 0.26)
         if self.tracker_R.fingertips[1][0] != -1:
-            hl_R_col = float(self.tracker_R.fingertips[1][0] - self.tracker_R.cx + 25) / (-50)
+            hl_R_col = float(self.tracker_R.fingertips[1][0] - self.tracker_R.cx) / (-50) - 0.5
             # A Trick
             hl_R_col = hl_R_col + 1.5 - (hl_R_row * 0.71 + 0.26)
         self.keyboard.update_hightlight(hl_L_row, hl_L_col, hl_R_row, hl_R_col)

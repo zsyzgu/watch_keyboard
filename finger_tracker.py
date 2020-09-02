@@ -305,7 +305,10 @@ class FingerTracker: # 1280 * 960
             if self.is_touch[i]:
                 [X, Y] = self.fingertips[i]
                 X, Y = self.map1[Y, X] # Undistortion
-                offset = (self.cy - Y) / (self.camera_H * self.fy / 80.0 + 1) # (80.0 = 8 * 10) Offset is -8 pixels when z = 10 cm
+                if self.camera_id == 1:
+                    offset = (self.cy - Y) / (self.camera_H * self.fy / 90.0 + 1) # (90.0 = 9 * 10) Offset is -9 pixels when z = 10 cm
+                else:
+                    offset = (self.cy - Y) / (self.camera_H * self.fy / 170.0 + 1) # Offset is -17 pixels when z = 10 cm
                 Y += offset
                 z = (self.camera_H * self.fy) / (Y - self.cy)
                 x = (X - self.cx) / self.fx * z
@@ -378,7 +381,7 @@ class FingerTracker: # 1280 * 960
         cv2.putText(result, title, tuple([0, 100]), 0, 1.2, (0,0,255), 3)
         result = cv2.resize(result, (320, 240))
         cv2.line(result, (int(self.cx)//4, 0), (int(self.cx)//4, self.N//4 - 1), (64,64,64), 1)
-        cv2.line(result, (0, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (self.M//4 - 1, (int(self.cy)+self.SECOND_ROW_DELTA)//4), (64,64,64), 1)
+        cv2.line(result, (0, int(self.cy)//4), (self.M//4 - 1, int(self.cy)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
         
         return result
