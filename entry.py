@@ -79,18 +79,20 @@ class Exp3(Exp):
         super().__init__()
 
     def update_hightlight(self):
-        hl_L_row = (self.tracker_L.cy - self.tracker_L.palm_line) * 0.01-0.5
+        hl_L_row = (self.tracker_L.cy - self.tracker_L.palm_line) * 0.01-0.5 # (0.5~3.5) 1.0 for the middle of the first row
         hl_R_row = (self.tracker_R.cy - self.tracker_R.palm_line) * 0.01-0.5
         hl_L_col = None
         hl_R_col = None
         if self.tracker_L.fingertips[1][0] != -1:
-            hl_L_col = float(self.tracker_L.fingertips[1][0] - self.tracker_L.cx) / (+50) - 0.5
-            # A Trick
-            hl_L_col = hl_L_col + 1.5 - (hl_L_row * 0.71 + 0.26)
+            X = self.tracker_L.fingertips[1][0]
+            z = 16.0 - hl_L_row * 2
+            x = (X - self.tracker_L.cx) / self.tracker_L.fx * z
+            hl_L_col = x * 0.5
         if self.tracker_R.fingertips[1][0] != -1:
-            hl_R_col = float(self.tracker_R.fingertips[1][0] - self.tracker_R.cx) / (-50) - 0.5
-            # A Trick
-            hl_R_col = hl_R_col + 1.5 - (hl_R_row * 0.71 + 0.26)
+            X = self.tracker_R.fingertips[1][0]
+            z = 16.0 - hl_R_row * 2
+            x = (X - self.tracker_R.cx) / self.tracker_R.fx * z
+            hl_R_col = x * -0.5
         self.keyboard.update_hightlight(hl_L_row, hl_L_col, hl_R_row, hl_R_col)
         if self.keyboard.VISABLE_FEEDBACK:
             self.keyboard.draw()
