@@ -22,7 +22,7 @@ class FingerTracker: # 1280 * 960
         self.TIP_HEIGHT = 12 # Deal with two recognized points on a fingertip
         self.TIP_WIDTH = 100 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
-        self.SECOND_ROW_DELTA = 30 # The second row of the keyboard is x pixels lower than camera_cy
+        self.SECOND_ROW_DELTA = 50 # The second row of the keyboard is x pixels lower than camera_cy
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
         self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.finger_names = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinkie']
@@ -179,7 +179,7 @@ class FingerTracker: # 1280 * 960
                 else:
                     w_thres = self.TIP_WIDTH
 
-                if r - l <= w_thres and X[l] != 0 and X[r] != self.M-1:
+                if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)):
                     [x,y] = [X[mid],Y[mid]]
                     if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
                         self.has_thumb = True
