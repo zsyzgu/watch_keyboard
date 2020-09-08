@@ -70,7 +70,10 @@ class FingerTracker: # 1280 * 960
 
     def find_brightness_threshold(self, image):
         if self.FIXED_BRIGHTNESS:
-            return 55
+            if self.camera_id == 1:
+                return 55
+            if self.camera_id == 2:
+                return 55
 
         palm_image = image[:self.N//2,:]
 
@@ -384,5 +387,5 @@ class FingerTracker: # 1280 * 960
         cv2.line(result, (0, int(self.cy)//4), (self.M//4 - 1, int(self.cy)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
         
-        return result
+        return result#cv2.resize(self.image, (320, 240))
 
