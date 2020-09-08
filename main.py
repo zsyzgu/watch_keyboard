@@ -4,6 +4,7 @@ from finger_tracker import FingerTracker
 import time
 import pickle
 import img2video
+import os
 
 def record():
     camera = cv2.VideoCapture(0)
@@ -32,18 +33,18 @@ def record():
     img2video.to_mp4(results, 'result.mp4')
 
 def test():
-    F = range(150,200)
+    folder_name = 'raw/L/'
+    file_names = os.listdir(folder_name)
     tracker = FingerTracker(1)
-    time_log = []
-    for index in F:
-        frame = cv2.imread('raw/' + str(index) + '.jpg')
-        t = time.clock()
+    for index in range(len(file_names)):
+        #index = 0
+        file_name = file_names[index]
+        print(file_name)
+        frame = cv2.imread(folder_name + file_name)
         tracker.run(frame)
-        time_log.append(time.clock()-t)
         output = tracker.output(str(index))
-        cv2.waitKey(1)
         cv2.imshow('illustration', output)
-    print('Mean time = %f' % (np.mean(time_log)))
+        cv2.waitKey(1)
 
 if __name__ == "__main__":
     #record()

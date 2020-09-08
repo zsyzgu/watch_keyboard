@@ -10,7 +10,7 @@ from scipy.stats import kurtosis
 class FingerTracker: # 1280 * 960
     CONTOURS_MIN_AREA = 6000 # the minimun area of contours of a finger
     PALM_THRESHOLD = 400 # the upper rows belong to the palm
-    FINGER_GAP = 50 # The minimum distance between two finger in x-axis
+    FINGER_GAP = 80 # The minimum distance between two finger in pixels on the contour
     FIXED_BRIGHTNESS = True
 
     def __init__(self, camera_id):
@@ -20,7 +20,7 @@ class FingerTracker: # 1280 * 960
     
     def init_fingertips(self):
         self.TIP_HEIGHT = 12 # Deal with two recognized points on a fingertip
-        self.TIP_WIDTH = 100 # Max width of a tip (excluding thumb)
+        self.TIP_WIDTH = 150 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
         self.SECOND_ROW_DELTA = 50 # The second row of the keyboard is x pixels lower than camera_cy
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
@@ -134,6 +134,9 @@ class FingerTracker: # 1280 * 960
         fingers = self.find_fingers(image, contours)
         fingertips = []
         self.has_thumb = False
+        
+        if len(fingers) > 0:
+            small_chunk = np.min([len(finger) for finger in fingers])
 
         for finger in fingers:
             l = np.argmin(finger[:,0])
@@ -161,10 +164,10 @@ class FingerTracker: # 1280 * 960
                 ids.remove(-1)
 
             if self.camera_id == 1: # Left hand
-                maybe_thumb = (np.max(finger[:,0]) == self.M-1)
+                maybe_thumb = (len(finger) == small_chunk) and (np.max(finger[:,0]) == self.M-1)
                 ids.reverse()
             else: # Right hand
-                maybe_thumb = (np.min(finger[:,0]) == 0)
+                maybe_thumb = (len(finger) == small_chunk) and (np.min(finger[:,0]) == 0)
 
             for i in range(len(ids)): # Judge finger height and width
                 id = ids[i]
@@ -185,7 +188,8 @@ class FingerTracker: # 1280 * 960
                 if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)):
                     [x,y] = [X[mid],Y[mid]]
                     if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
-                        self.has_thumb = True
+                        if maybe_thumb:
+                            self.has_thumb = True
                         maybe_thumb = False
                         fingertips.append([x,y])
 
