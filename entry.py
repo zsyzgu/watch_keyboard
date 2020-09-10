@@ -100,6 +100,8 @@ class Exp3(Exp):
     def run(self):
         self.keyboard.draw()
 
+        start_time = 0
+
         is_running = True
         is_illustration = True
         while is_running:
@@ -138,6 +140,8 @@ class Exp3(Exp):
                         palm_line = self.tracker_R.palm_line
                 letter = calc_letter(side, index, self.keyboard)
                 if letter != '-':
+                    if len(self.keyboard.inputted_text) == 0:
+                        start_time = time.clock()
                     self.keyboard.enter_a_letter(letter)
                     self.keyboard.draw()
                 else:
@@ -151,6 +155,8 @@ class Exp3(Exp):
                 is_running = False
             if pygame.K_n in keys or self.tracker_L.is_touch_down[0]: # Next phrase
                 if len(self.keyboard.inputted_text) == len(self.keyboard.task_list[self.keyboard.curr_task_id]):
+                    t = time.clock() - start_time
+                    print('WPM = %f', (len(self.keyboard.inputted_text)-1)/(t/60.0)/5.0)
                     succ = self.keyboard.next_phrase()
                     if not succ:
                         is_running = False
