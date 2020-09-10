@@ -108,6 +108,7 @@ class Exp3(Exp):
             succ, image_L, image_R = self.acquire_frame()
             if not succ:
                 break
+            t=time.clock()
             self.tracker_L.run(image_L)
             self.tracker_R.run(image_R)
 
@@ -164,6 +165,7 @@ class Exp3(Exp):
             if pygame.K_r in keys: # Redo phrase
                 self.keyboard.redo_phrase()
                 self.keyboard.draw()
+            print(time.clock()-t)
 
 if __name__ == "__main__":
     exp = Exp3()

@@ -69,6 +69,8 @@ def split_fingers(frame):
     frame=cv2.UMat(frame)
     kernel = np.uint8(np.ones((1, 3)))
     B=cv2.Sobel(frame,-1,1,0,ksize=-1)
+    cv2.imshow('p',B)
+    cv2.waitKey(0)
     r1=cv2.subtract(frame,cv2.min(frame,B))
     _, r1 = cv2.threshold(r1, 55, 255, type=cv2.THRESH_TOZERO)
     r1 = cv2.erode(r1, kernel, iterations=4)
@@ -83,17 +85,24 @@ def test():
     folder_name = 'raw/'
     file_names = os.listdir(folder_name)
     tracker = FingerTracker(1)
-    for index in range(0,250):
-        file_name = file_names[index]
-        print(file_name)
-        
+    ts = []
+    for index in range(100,150):
+        #file_name = file_names[index]
+        file_name = str(index) + '.jpg'
         frame = cv2.imread(folder_name + file_name)
-        tracker.run(frame)
-        output = tracker.output()
+        #t=time.clock()
+        #tracker.run(frame)
+        #t=time.clock()-t
+        frame = cv2.resize(frame, (1280//10,960//10))
+        frame = split_fingers(frame)
+        #print(t)
+        #ts.append(t)
+        #output = tracker.output()
 
-        cv2.imshow('illustration', output)
+        cv2.imshow('illustration', frame)
         cv2.waitKey(0)
         break
+    print(np.mean(ts))
 
 if __name__ == "__main__":
     #record()
