@@ -65,43 +65,75 @@ def record_touch_data():
             if index == 150:
                 break
 
+def deal_touch_data():
+    tracker = FingerTracker(1)
+
+    for r in range(3):
+        for c in range(5):
+            X = []
+            Y = []
+            for index in range(150):
+                iteration = int(index // 15)
+                row = int((index % 15) // 5)
+                col = int(index % 5)
+                if row == r and col == c:
+                    file_name = 'raw/' + str(iteration) + '_' + str(row) + '_' + str(col) + '.jpg'
+                    frame = cv2.imread(file_name)
+                    tracker.run(frame)
+                    output = tracker.output(str(index))
+                    cv2.imshow('illustration', output)
+                    cv2.waitKey(1)
+                    for i in range(5):
+                        if tracker.is_touch[i]:
+                            x = tracker.endpoints[i][0]
+                            y = tracker.palm_line#tracker.endpoints[i][1]
+                            X.append(x)
+                            Y.append(y)
+            if len(X) > 0:
+                plt.scatter(X,Y)
+    plt.show()
+
 def split_fingers(frame):
     kernel = np.uint8(np. ones((1, 3)))
 
-    sob1 = cv2.Sobel(frame[0:480,480:800], -1, 1, 0, ksize=-1)
-    r1 = cv2.subtract(frame[0:480,480:800], sob1)
+    sob1 = cv2.Sobel(frame, -1, 1, 0, ksize=-1)
+    r1 = cv2.subtract(frame, sob1)
     _, r1 = cv2.threshold(r1, 55, 255, type=cv2.THRESH_TOZERO)
     r1 = cv2.erode(r1, kernel, iterations=4)
 
-    sob2 = cv2.flip(cv2.Sobel(cv2.flip(frame[0:480,480:800], 1), -1, 1, 0, ksize=-1), 1)
-    r2 = cv2.subtract(frame[0:480,480:800], sob2)
+    sob2 = cv2.flip(cv2.Sobel(cv2.flip(frame, 1), -1, 1, 0, ksize=-1), 1)
+    r2 = cv2.subtract(frame, sob2)
     _, r2 = cv2.threshold(r2, 55, 255, type=cv2.THRESH_TOZERO)
     r2 = cv2.erode(r2, kernel, iterations=4)
 
     r = cv2.max(r1,r2)
-    frame[0:480,480:800]=r
-    return frame,r
+    return r
+
+def try_ostu(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    thres, output = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU)
+    print(thres)
+    return output
 
 def test():
-    folder_name = 'raw/'
-    file_names = os.listdir(folder_name)
-    tracker = FingerTracker(1)
-    ts = []
-    for index in range(0,200):
+    input_folder = 'raw/'
+    output_folder = 'fail_cases/'
+    file_names = os.listdir(input_folder)
+    tracker = FingerTracker(2)
+    for index in range(len(file_names)):
         #file_name = file_names[index]
-        file_name = str(index) + '.jpg'
-        frame = cv2.imread(folder_name + file_name)
+        file_name = '156.jpg'
+        frame = cv2.imread(input_folder + file_name)
         t=time.clock()
         tracker.run(frame)
-        t=time.clock()-t
-        #print(t)
-        ts.append(t)
         output = tracker.output()
+        t=time.clock()-t
+        print(file_name)
         cv2.imshow('e',output)
-        cv2.waitKey(1)
-
-    print(np.mean(ts))
+        key = cv2.waitKey(0)
+        break
 
 if __name__ == "__main__":
-    #record()
+    #record_touch_data()
+    #deal_touch_data()
     test()

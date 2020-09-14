@@ -15,11 +15,10 @@ class FingerTracker: # 1280 * 960
 
     def __init__(self, camera_id):
         self.init_fingertips()
-        self.BRIGHTNESS_THRESHOLD = 100 # Default brightness threshold
         self.init_camera_para(camera_id)
     
     def init_fingertips(self):
-        self.TIP_HEIGHT = 12 # Deal with two recognized points on a fingertip
+        self.TIP_HEIGHT = 10 # Deal with two recognized points on a fingertip
         self.TIP_WIDTH = 180 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
         self.SECOND_ROW_DELTA = 50 # The second row of the keyboard is x pixels lower than camera_cy
@@ -31,7 +30,6 @@ class FingerTracker: # 1280 * 960
         self.is_touch = [False for i in range(5)]
         self.is_touch_down = [False for i in range(5)]
         self.is_touch_up = [False for i in range(5)]
-        self.curr_middle_finger = [-1, -1] # The tip of the middle finger in the latest available frame
         self.palm_line = 0 # The root of the middle finger (in y axis)
         self.palm_line_dx = 0 # (dx,dy) = the vector between the groove of 2nd/3rd fingers and the groove of 3rd/4th fingers
         self.palm_line_dy = 0
@@ -159,7 +157,7 @@ class FingerTracker: # 1280 * 960
 
         return y
 
-    def find_fingertips(self, contours):
+    def find_fingertips(self, image, contours):
         fingers = self.find_fingers(contours)
         if len(fingers) == 0:
             return np.array([])
@@ -194,10 +192,10 @@ class FingerTracker: # 1280 * 960
                 ids.remove(-1)
 
             if self.camera_id == 1: # Left hand
-                maybe_thumb = (len(finger) == small_chunk) and (np.max(finger[:,0]) == self.M-1)
+                maybe_thumb = (np.max(finger[:,0]) == self.M-1)
                 ids.reverse()
             else: # Right hand
-                maybe_thumb = (len(finger) == small_chunk) and (np.min(finger[:,0]) == 0)
+                maybe_thumb = (np.min(finger[:,0]) == 0)
 
             for i in range(len(ids)): # Judge finger height and width
                 id = ids[i]
@@ -215,10 +213,11 @@ class FingerTracker: # 1280 * 960
 
                 if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)) and r-l>=20:
                     [x,y] = [X[mid],Y[mid]]
-                    if maybe_thumb:
-                        self.has_thumb = True
-                    maybe_thumb = False
-                    fingertips.append([x,y])
+                    if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
+                        if maybe_thumb:
+                            self.has_thumb = True
+                        maybe_thumb = False
+                        fingertips.append([x,y])
 
         fingertips = np.array(fingertips)
         if fingertips.shape[0] > 5:
@@ -269,29 +268,18 @@ class FingerTracker: # 1280 * 960
         if len(fingertips) == 0:
             self.init_fingertips()
             return False
-            
+        
         order = np.argsort(fingertips[:,0])
         if self.camera_id == 1: # Left hand
             order = order[::-1]
         fingertips = fingertips[order]
-        if self.camera_id == 1: # Left hand
-            has_pinkie = (fingertips[-1][0] <= self.cx - 200)
-        else: # Right hand
-            has_pinkie = (fingertips[-1][0] >= self.cx + 200)
 
         # Mapping fingers
         if len(fingertips) == 5:
             self.fingertips = fingertips.copy()
-        elif len(fingertips) == 4 and has_pinkie == False: # No pinkie
-            self.fingertips[:-1] = fingertips.copy()
-            self.fingertips[-1] = [-1, -1]
         elif len(fingertips) == 4 and self.has_thumb == False: # No thumb
             self.fingertips[0] = [-1, -1]
             self.fingertips[1:] = fingertips.copy()
-        elif len(fingertips) == 3 and self.has_thumb == False and has_pinkie == False: # No thumb and pinkie
-            self.fingertips[0] = [-1, -1]
-            self.fingertips[1:-1] = fingertips.copy()
-            self.fingertips[-1] = [-1, -1]
         else: # Track the fingers: Greedy-based best match algorithm, max movement = 80 pixel/frame
             fingertip_num = len(fingertips)
             matrix = -np.ones((fingertip_num, 5))
@@ -381,7 +369,7 @@ class FingerTracker: # 1280 * 960
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED) # There is a table, but not connect with fingers
                 contours.remove(table_contour)
         
-        fingertips = self.find_fingertips(contours)
+        fingertips = self.find_fingertips(gray, contours)
         self.assign_fingertips(fingertips)
         self.calc_touch(touch_line)
         self.calc_endpoints()
@@ -389,12 +377,10 @@ class FingerTracker: # 1280 * 960
 
         # Save intermediate result
         self.illustration = gray
-        self.fingers_contours = contours
         self.touch_line = touch_line
 
     def output(self, title=''):
         result = self.illustration
-        #result = cv2.drawContours(result, self.fingers_contours, -1, 192, 3)
         
         for i in range(len(self.fingertips)):
             fingertip = self.fingertips[i]
@@ -405,6 +391,7 @@ class FingerTracker: # 1280 * 960
                 size = 20
             else:
                 size = 10
+
             cv2.circle(result, tuple(fingertip), size, 255, cv2.FILLED)
             cv2.putText(result, self.finger_names[i][0], tuple([fingertip[0]+15, fingertip[1]]), 0, 1.2, 255, 3)
 
@@ -418,5 +405,4 @@ class FingerTracker: # 1280 * 960
         cv2.line(result, (0, int(self.cy)//4), (self.M//4 - 1, int(self.cy)//4), (64,64,64), 1)
         cv2.line(result, (0, self.palm_line//4), (self.M//4 - 1, self.palm_line//4), (0,0,128), 1)
         
-        return result#cv2.resize(self.image, (320, 240))
-
+        return result
