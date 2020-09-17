@@ -79,6 +79,7 @@ class Keyboard:
     def init_inputted_data(self):
         self.inputted_text = ''
         self.inputted_data = []
+        self.last_touch_time = -1
 
     def init_display(self):
         self.screen = pygame.display.set_mode((10 * self.GRID + 1, 4 * self.GRID + 1))
@@ -126,7 +127,13 @@ class Keyboard:
                 col_pixel = int((7.5 - col) * GRID)
                 image[1*GRID:4*GRID,col_pixel-2:col_pixel+3] *= 2
         elif self.VISABLE_FEEDBACK == self.VISABLE_TOUCH:
-            pass
+            DURATION = 0.5
+            if time.clock() - self.last_touch_time < DURATION and len(self.inputted_data) > 0:
+                [col, row] = self.get_position(self.inputted_data[-1])
+                row_pixel = int((row - 0.5 + 2) * GRID)
+                col_pixel = int((col - 0.5 + 1) * GRID)
+                schedule = (time.clock() - self.last_touch_time) / DURATION
+                image[row_pixel-5:row_pixel+6,col_pixel-5:col_pixel+6] = cv2.add(image[row_pixel-5:row_pixel+6,col_pixel-5:col_pixel+6], int(255 * (1 - schedule)))
         elif self.VISABLE_FEEDBACK == self.VISABLE_NO:
             pass
 
@@ -159,6 +166,7 @@ class Keyboard:
                 letter = input_letter
             self.inputted_text += letter
             self.inputted_data.append(input_data)
+            self.last_touch_time = time.clock() 
         return letter
 
     def enter_a_space(self, input_data):
@@ -180,24 +188,27 @@ class Keyboard:
             self.inputted_text = self.inputted_text[:-1]
             self.inputted_data = self.inputted_data[:-1]
 
+    def get_position(self, data): # get position from inputted data
+        [side, index, highlight_row, highlight_col] = data[:4]
+        row = max(0-0.5,min(2+0.5,highlight_row - 1))
+        col = max(0-0.5,min(1+0.5,highlight_col - 1))
+        if side == 'L':
+            if index == 1:
+                col = 3 + col
+            else:
+                col = 3 - (index - 1)
+        if side == 'R':
+            if index == 1:
+                col = 6 - col
+            else:
+                col = 6 + (index - 1)
+        return [col, row]
+
     def word_correction(self, inputted_data):
         positions = []
         for data in inputted_data:
-            [side, index, highlight_row, highlight_col] = data[:4]
-            row = max(0-1,min(2+1,highlight_row - 1))
-            col = max(0-1,min(1+1,highlight_col - 1))
-            if side == 'L':
-                if index == 1:
-                    col = 3 + col
-                else:
-                    col = 3 - (index - 1)
-            if side == 'R':
-                if index == 1:
-                    col = 6 - col
-                else:
-                    col = 6 + (index - 1)
-
-            positions.append([col, row])
+            pos = self.get_position(data)
+            positions.append(pos)
         
         N = len(self.corpus)
         max_pri = 0

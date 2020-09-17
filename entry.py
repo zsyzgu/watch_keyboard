@@ -12,7 +12,7 @@ import pickle
 
 class Exp:
     def __init__(self):
-        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_WORD)
+        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_TOUCH, WORD_CORRECTION=Keyboard.CORRECT_WORD)
         self.tracker_L = FingerTracker(1)
         self.tracker_R = FingerTracker(2)
         self.init_camera()
