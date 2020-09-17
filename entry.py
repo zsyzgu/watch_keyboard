@@ -40,25 +40,20 @@ class Exp:
                 keys.append(event.key)
         return keys
 
-def calc_letter(side, index, keyboard):
+def calc_letter(keyboard, input_data):
+    [side, index, highlight_row, highlight_col] = input_data[:4]
+    row = int(round(max(0,min(2,highlight_row - 1))))
+    col = int(round(max(0,min(1,highlight_col - 1))))
     if side == 'L':
-        row = max(0,min(2,int(round(keyboard.L_row - 1))))
         if index == 1:
-            if keyboard.L_col >= 1.5:
-                col = 4
-            else:
-                col = 3
+            col = 3 + col
         else:
-            col = 4 - index
+            col = 3 - (index - 1)
     if side == 'R':
-        row = max(0,min(2,int(round(keyboard.R_row - 1))))
         if index == 1:
-            if keyboard.R_col >= 1.5:
-                col = 5
-            else:
-                col = 6
+            col = 6 - col
         else:
-            col = 5 + index
+            col = 6 + (index - 1)
     
     for i in range(26):
         [c, r] = keyboard.letter_positions[i]
@@ -79,11 +74,10 @@ class Exp3(Exp):
         super().__init__()
 
     def update_hightlight(self):
-        L_row = self.tracker_L.highlight_row
-        L_col = self.tracker_L.highlight_col
-        R_row = self.tracker_R.highlight_row
-        R_col = self.tracker_R.highlight_col
-        self.keyboard.update_hightlight(L_row, L_col, R_row, R_col)
+        self.keyboard.L_row = self.tracker_L.highlight_row
+        self.keyboard.L_col = self.tracker_L.highlight_col
+        self.keyboard.R_row = self.tracker_R.highlight_row
+        self.keyboard.R_col = self.tracker_R.highlight_col
 
     def run(self):
         self.keyboard.draw()
@@ -107,33 +101,28 @@ class Exp3(Exp):
 
             keys = self.get_keyboard_events()
             if self.tracker_R.is_touch_down[0] or pygame.K_SPACE in keys: # Entry a space
-                self.keyboard.enter_a_space()
+                input_data = ['R', 0, self.tracker_R.highlight_row, self.tracker_R.highlight_col] # Formal: [L or R, finger index, highlight_row, highlight_col]
+                self.keyboard.enter_a_space(input_data)
             if (True in self.tracker_L.is_touch_down[1 : 5]) or (True in self.tracker_R.is_touch_down[1 : 5]): # Entry a letter
                 for i in range(1, 5):
                     if self.tracker_L.is_touch_down[i]:
-                        side = 'L'
-                        index = i
+                        input_data = ['L', i, self.tracker_L.highlight_row, self.tracker_L.highlight_col]
                     if self.tracker_R.is_touch_down[i]:
-                        side = 'R'
-                        index = i
-                letter = calc_letter(side, index, self.keyboard)
+                        input_data = ['R', i, self.tracker_R.highlight_row, self.tracker_R.highlight_col]
+                letter = calc_letter(self.keyboard, input_data)
                 if letter != '-':
                     if len(self.keyboard.inputted_text) == 0:
                         start_time = time.clock()
                     else:
                         end_time = time.clock()
-                    self.keyboard.enter_a_letter(letter)
+                    self.keyboard.enter_a_letter(input_data, letter)
                 else:
                     self.keyboard.delete_a_letter()
-            if pygame.K_i in keys: # open/close illustration
-                is_illustration ^= True
-                if is_illustration == False:
-                    cv2.destroyAllWindows()
             if pygame.K_q in keys: # Quit
                 is_running = False
             if pygame.K_n in keys or self.tracker_L.is_touch_down[0]: # Next phrase
                 if len(self.keyboard.inputted_text) == len(self.keyboard.task_list[self.keyboard.curr_task_id]):
-                    print('WPM = %f', (len(self.keyboard.inputted_text)-1)/((end_time - start_time)/60.0)/5.0)
+                    print('WPM = ', (len(self.keyboard.inputted_text)-1)/((end_time - start_time)/60.0)/5.0)
                     succ = self.keyboard.next_phrase()
                     if not succ:
                         is_running = False

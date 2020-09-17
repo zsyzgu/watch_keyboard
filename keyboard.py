@@ -4,6 +4,7 @@ import time
 import random
 import pygame
 import math
+from PIL import Image, ImageFont, ImageDraw
 
 class Keyboard:
     GRID = 50
@@ -19,23 +20,10 @@ class Keyboard:
         self.WORD_CORRECTION = WORD_CORRECTION
         self.init_letter_positions()
         self.init_task_list('phrases.txt')
-        self.inputted_text = ''
-        self.init_candidates()
+        self.init_corpus()
+        self.init_inputted_data()
         self.init_display()
     
-    def init_candidates(self):
-        self.candidates = ['' for i in range(5)]
-        if self.WORD_CORRECTION:
-            self.corpus = []
-            lines = open('corpus.txt').readlines()
-            CORPUS_AMOUNT = 20000
-            for i in range(CORPUS_AMOUNT):
-                line = lines[i]
-                tags = line.strip().split(' ')
-                word = tags[0]
-                pri = int(tags[1])
-                self.corpus.append((word, pri))
-
     def init_letter_positions(self):
         QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
         FINGER_PINKIE = 'QAZ|P'
@@ -64,7 +52,7 @@ class Keyboard:
                 elif ch in FINGER_INDEX_R:
                     color = (0,0,I)
                 self.letter_colors[index] = color
-    
+
     def init_task_list(self, path):
         self.task_list = []
         self.curr_task_id = 0
@@ -75,6 +63,22 @@ class Keyboard:
             self.task_list.append(line.strip('\n'))
 
         random.shuffle(self.task_list)
+
+    def init_corpus(self):
+        if self.WORD_CORRECTION:
+            self.corpus = []
+            lines = open('corpus.txt').readlines()
+            CORPUS_AMOUNT = 20000
+            for i in range(CORPUS_AMOUNT):
+                line = lines[i]
+                tags = line.strip().split(' ')
+                word = tags[0]
+                pri = int(tags[1])
+                self.corpus.append((word, pri))
+
+    def init_inputted_data(self):
+        self.inputted_text = ''
+        self.inputted_data = []
 
     def init_display(self):
         self.screen = pygame.display.set_mode((10 * self.GRID + 1, 4 * self.GRID + 1))
@@ -129,22 +133,12 @@ class Keyboard:
         pg_img = pygame.surfarray.make_surface(cv2.transpose(image))
         self.screen.blit(pg_img, (0,0))
         pygame.display.flip()
-
-    def update_hightlight(self, L_row, L_col, R_row, R_col):
-        if L_row != None:
-            self.L_row = L_row
-        if L_col != None:
-            self.L_col = L_col
-        if R_row != None:
-            self.R_row = R_row
-        if R_col != None:
-            self.R_col = R_col
     
     def next_phrase(self):
         self.curr_task_id += 1
         print('Phase = %d' % (self.curr_task_id))
         self.inputted_text = ''
-        self.init_candidates()
+        self.inputted_data = []
         if self.curr_task_id >= len(self.task_list):
             self.curr_task_id = 0
             return False
@@ -152,50 +146,66 @@ class Keyboard:
 
     def redo_phrase(self):
         self.inputted_text = ''
-        self.init_candidates()
+        self.inputted_data = []
 
-    def enter_a_letter(self, default = None):
+    def enter_a_letter(self, input_data, input_letter):
         i = len(self.inputted_text)
         task = self.task_list[self.curr_task_id]
         letter = ''
-        if i < len(task) and task[i] != ' ':
-            if default == None:
+        if i < len(task):
+            if self.WORD_CORRECTION == self.CORRECT_LETTER:
                 letter = task[i]
             else:
-                letter = default
+                letter = input_letter
             self.inputted_text += letter
+            self.inputted_data.append(input_data)
         return letter
 
-    def enter_a_space(self):
+    def enter_a_space(self, input_data):
         i = len(self.inputted_text)
         task = self.task_list[self.curr_task_id]
-        if self.WORD_CORRECTION and (i >= len(task) - 1 or task[i] == ' '):
+        if self.WORD_CORRECTION == self.CORRECT_WORD:
             tags = self.inputted_text.split(' ')
-            if len(tags) > 0 and len(tags[-1]) > 0:
-                word = tags[-1]
-                word = self.word_correction(word)
+            if len(tags) > 0 and tags[-1] != '':
+                word = self.word_correction(self.inputted_data[-len(tags[-1]):])
+                assert(len(tags[-1]) == len(word))
                 tags[-1] = word
                 self.inputted_text = ' '.join(tags)
-        if i < len(task) and task[i] == ' ':
+        if i < len(task):
             self.inputted_text += ' '
+            self.inputted_data.append(input_data)
     
     def delete_a_letter(self):
         if len(self.inputted_text) > 0:
             self.inputted_text = self.inputted_text[:-1]
+            self.inputted_data = self.inputted_data[:-1]
 
-    def word_correction(self, word):
+    def word_correction(self, inputted_data):
         positions = []
-        for letter in word:
-            index = ord(letter) - ord('a')
-            positions.append(self.letter_positions[index])
+        for data in inputted_data:
+            [side, index, highlight_row, highlight_col] = data[:4]
+            row = max(0-1,min(2+1,highlight_row - 1))
+            col = max(0-1,min(1+1,highlight_col - 1))
+            if side == 'L':
+                if index == 1:
+                    col = 3 + col
+                else:
+                    col = 3 - (index - 1)
+            if side == 'R':
+                if index == 1:
+                    col = 6 - col
+                else:
+                    col = 6 + (index - 1)
+
+            positions.append([col, row])
         
         N = len(self.corpus)
         max_pri = 0
-        best_candidate = word
+        best_candidate = ''
         for i in range(N):
             (candidate, pri) = self.corpus[i]
-            if len(candidate) == len(word):
-                for j in range(len(word)):
+            if len(candidate) == len(inputted_data):
+                for j in range(len(inputted_data)):
                     letter = candidate[j]
                     index = ord(letter) - ord('a')
                     position = self.letter_positions[index]

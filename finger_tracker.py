@@ -360,10 +360,21 @@ class FingerTracker: # 1280 * 960
         return y
 
     def calc_highlight(self):
-        if self.palm_line > self.row_position[1]:
+        if self.palm_line > self.row_position[1]: # Linear Model
             row = 2 - (self.palm_line - self.row_position[1]) / (self.row_position[0] - self.row_position[1])
         else:
             row = 2 + (self.palm_line - self.row_position[1]) / (self.row_position[2] - self.row_position[1])
+
+        '''
+        if self.palm_line > self.row_position[1]: # Two Sticks Model: a + b * row = z = (H * fy) / (palm_line - cy)
+            a = self.camera_H * self.fy / (self.row_position[0] - self.cy)
+            b = self.camera_H * self.fy / (self.row_position[1] - self.cy) - a
+            row = (self.camera_H * self.fy / (self.palm_line - self.cy) - a) / b + 1
+        else:
+            a = self.camera_H * self.fy / (self.row_position[1] - self.cy)
+            b = self.camera_H * self.fy / (self.row_position[2] - self.cy) - a
+            row = (self.camera_H * self.fy / (self.palm_line - self.cy) - a) / b + 2
+        '''
         
         col = None
         if self.fingertips[1][0] != -1:

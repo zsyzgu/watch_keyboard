@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import pickle
 import sys
 import pygame
+from matplotlib.patches import Ellipse
+from astroML.stats import fit_bivariate_normal
+from astroML.stats.random import bivariate_normal
 
 class Visual:
     GRID = 50
@@ -139,7 +142,8 @@ def record(camera_id):
 def calc(camera_id, frames):
     tracker = FingerTracker(camera_id)
 
-    pc = np.zeros((3, 5, 2))
+    pc = np.zeros((3, 5, 5))
+    fig, ax = plt.subplots()
 
     for r in range(3):
         for c in range(5):
@@ -151,6 +155,7 @@ def calc(camera_id, frames):
                 col = int(index % 5)
                 if row == r and col == c:
                     frame = frames[index]
+                    #frame = cv2.imread('raw/' + str(iteration) + '_' + str(r) + '_' + str(c) + '.jpg')
                     tracker.run(frame)
                     output = tracker.output(str(index))
                     cv2.imshow('illustration', output)
@@ -161,14 +166,21 @@ def calc(camera_id, frames):
                             y = tracker.palm_line#tracker.endpoints[i][1]
                             X.append(x)
                             Y.append(y)
+            X = np.array(X)
+            Y = np.array(Y)
             assert(len(X) > 0)
-            pc[r,c] = [np.mean(X), np.mean(Y)]
+            n_std = 3
+            (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
+            xc, yc = center
+            ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+            index = r * 5 + c + 1
+            plt.scatter(X, Y, color=('C'+str(index)), s = 5)
+            plt.scatter(xc, yc, color='red', s = 10)
+            ax.add_patch(ell)
 
-    for r in range(3):
-        for c in range(5):
-            plt.scatter([pc[r,c,0]],[pc[r,c,1]])
-    plt.show()
-    
+            pc[r,c] = [xc, yc, a, b, theta]
+
+    plt.show()    
     pickle.dump(pc, open(str(camera_id) + '.regist', 'wb'))
 
 if __name__ == "__main__":
