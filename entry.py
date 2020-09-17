@@ -12,7 +12,7 @@ import pickle
 
 class Exp:
     def __init__(self):
-        self.keyboard = Keyboard()
+        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_WORD)
         self.tracker_L = FingerTracker(1)
         self.tracker_R = FingerTracker(2)
         self.init_camera()
@@ -42,18 +42,18 @@ class Exp:
 
 def calc_letter(side, index, keyboard):
     if side == 'L':
-        row = max(0,min(2,int(round(keyboard.hl_L_row - 1))))
+        row = max(0,min(2,int(round(keyboard.L_row - 1))))
         if index == 1:
-            if keyboard.hl_L_col >= 1.5:
+            if keyboard.L_col >= 1.5:
                 col = 4
             else:
                 col = 3
         else:
             col = 4 - index
     if side == 'R':
-        row = max(0,min(2,int(round(keyboard.hl_R_row - 1))))
+        row = max(0,min(2,int(round(keyboard.R_row - 1))))
         if index == 1:
-            if keyboard.hl_R_col >= 1.5:
+            if keyboard.R_col >= 1.5:
                 col = 5
             else:
                 col = 6
@@ -79,31 +79,16 @@ class Exp3(Exp):
         super().__init__()
 
     def update_hightlight(self):
-        hl_L_row = (self.tracker_L.cy - self.tracker_L.palm_line) * 0.01-0.5 # (0.5~3.5) 1.0 for the middle of the first row
-        hl_R_row = (self.tracker_R.cy - self.tracker_R.palm_line) * 0.01-0.5
-        hl_L_col = None
-        hl_R_col = None
-        if self.tracker_L.fingertips[1][0] != -1:
-            X = self.tracker_L.fingertips[1][0]
-            z = 16.0 - hl_L_row * 2
-            x = (X - self.tracker_L.cx) / self.tracker_L.fx * z
-            hl_L_col = x * 0.5
-        if self.tracker_R.fingertips[1][0] != -1:
-            X = self.tracker_R.fingertips[1][0]
-            z = 16.0 - hl_R_row * 2
-            x = (X - self.tracker_R.cx) / self.tracker_R.fx * z
-            hl_R_col = x * -0.5
-        self.keyboard.update_hightlight(hl_L_row, hl_L_col, hl_R_row, hl_R_col)
-        if self.keyboard.VISABLE_FEEDBACK:
-            self.keyboard.draw()
+        L_row = self.tracker_L.highlight_row
+        L_col = self.tracker_L.highlight_col
+        R_row = self.tracker_R.highlight_row
+        R_col = self.tracker_R.highlight_col
+        self.keyboard.update_hightlight(L_row, L_col, R_row, R_col)
 
     def run(self):
         self.keyboard.draw()
 
-        start_time = 0
-
         is_running = True
-        is_illustration = True
         while is_running:
             succ, image_L, image_R = self.acquire_frame()
             if not succ:
@@ -111,7 +96,7 @@ class Exp3(Exp):
             self.tracker_L.run(image_L)
             self.tracker_R.run(image_R)
 
-            if is_illustration:
+            if True:
                 output_L = self.tracker_L.output()
                 output_R = self.tracker_R.output()
                 output = np.hstack([output_L, output_R])
@@ -123,30 +108,23 @@ class Exp3(Exp):
             keys = self.get_keyboard_events()
             if self.tracker_R.is_touch_down[0] or pygame.K_SPACE in keys: # Entry a space
                 self.keyboard.enter_a_space()
-                self.keyboard.draw()
             if (True in self.tracker_L.is_touch_down[1 : 5]) or (True in self.tracker_R.is_touch_down[1 : 5]): # Entry a letter
                 for i in range(1, 5):
                     if self.tracker_L.is_touch_down[i]:
                         side = 'L'
                         index = i
-                        position = self.tracker_L.fingertips[i]
-                        endpoint = self.tracker_L.endpoints[i]
-                        palm_line = self.tracker_L.palm_line
                     if self.tracker_R.is_touch_down[i]:
                         side = 'R'
                         index = i
-                        position = self.tracker_R.fingertips[i]
-                        endpoint = self.tracker_R.endpoints[i]
-                        palm_line = self.tracker_R.palm_line
                 letter = calc_letter(side, index, self.keyboard)
                 if letter != '-':
                     if len(self.keyboard.inputted_text) == 0:
                         start_time = time.clock()
+                    else:
+                        end_time = time.clock()
                     self.keyboard.enter_a_letter(letter)
-                    self.keyboard.draw()
                 else:
                     self.keyboard.delete_a_letter()
-                    self.keyboard.draw()
             if pygame.K_i in keys: # open/close illustration
                 is_illustration ^= True
                 if is_illustration == False:
@@ -155,15 +133,14 @@ class Exp3(Exp):
                 is_running = False
             if pygame.K_n in keys or self.tracker_L.is_touch_down[0]: # Next phrase
                 if len(self.keyboard.inputted_text) == len(self.keyboard.task_list[self.keyboard.curr_task_id]):
-                    t = time.clock() - start_time
-                    print('WPM = %f', (len(self.keyboard.inputted_text)-1)/(t/60.0)/5.0)
+                    print('WPM = %f', (len(self.keyboard.inputted_text)-1)/((end_time - start_time)/60.0)/5.0)
                     succ = self.keyboard.next_phrase()
                     if not succ:
                         is_running = False
-                    self.keyboard.draw()
             if pygame.K_r in keys: # Redo phrase
                 self.keyboard.redo_phrase()
-                self.keyboard.draw()
+                
+            self.keyboard.draw()
 
 if __name__ == "__main__":
     exp = Exp3()

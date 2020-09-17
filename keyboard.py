@@ -7,10 +7,16 @@ import math
 
 class Keyboard:
     GRID = 50
+    VISABLE_NO = 0
+    VISABLE_TOUCH = 1
+    VISABLE_ALWAYS = 2
+    CORRECT_NO = 0
+    CORRECT_WORD = 1
+    CORRECT_LETTER = 2
     
-    def __init__(self):
-        self.VISABLE_FEEDBACK = True
-        self.WORD_CORRECTION = True
+    def __init__(self, VISABLE_FEEDBACK = VISABLE_ALWAYS, WORD_CORRECTION = CORRECT_WORD):
+        self.VISABLE_FEEDBACK = VISABLE_FEEDBACK
+        self.WORD_CORRECTION = WORD_CORRECTION
         self.init_letter_positions()
         self.init_task_list('phrases.txt')
         self.inputted_text = ''
@@ -44,7 +50,6 @@ class Keyboard:
             for c in range(len(line)):
                 ch = line[c]
                 index = ord(ch) - ord('A')
-                #self.letter_positions[index] = [c + r / 2, r]
                 self.letter_positions[index] = [c, r]
                 color = (0,0,0)
                 I = 64
@@ -70,18 +75,18 @@ class Keyboard:
             self.task_list.append(line.strip('\n'))
 
         random.shuffle(self.task_list)
-    
+
     def init_display(self):
-        self.screen = pygame.display.set_mode((10 * self.GRID + 1, 5 * self.GRID + 1))
+        self.screen = pygame.display.set_mode((10 * self.GRID + 1, 4 * self.GRID + 1))
         pygame.display.set_caption('Qwerty Watch')
-        self.hl_L_row = None # Hightline line
-        self.hl_L_col = None
-        self.hl_R_row = None
-        self.hl_R_col = None
+        self.L_row = None # Hightline line
+        self.L_col = None
+        self.R_row = None
+        self.R_col = None
 
     def draw(self):
         GRID = self.GRID
-        image = np.zeros((5 * GRID + 1, 10 * GRID + 1, 3), np.uint8)
+        image = np.zeros((4 * GRID + 1, 10 * GRID + 1, 3), np.uint8)
 
         cv2.rectangle(image, (0, 0), (10 * GRID, GRID - 1), (0, 0, 0), -1)
 
@@ -89,56 +94,51 @@ class Keyboard:
         cv2.putText(image, self.task_list[self.curr_task_id], (int(GRID * 0.5), int(GRID * 0.4)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         cv2.putText(image, self.inputted_text + '_', (int(GRID * 0.5), int(GRID * 0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-        # Draw candidates
-        for i in range(5):
-            cv2.rectangle(image, (i * 2 * GRID, GRID), ((i + 1) * 2 * GRID, 2 * GRID), (255, 255, 255), 1)
-            candidate = self.candidates[i]
-            font_size = 0.6
-            if (len(candidate) >= 8):
-                font_size = 4.8 / len(candidate)
-            cv2.putText(image, candidate, (int(i * 2 * GRID) + 5, 2 * GRID - 10), cv2.FONT_HERSHEY_SIMPLEX, font_size, (255, 255, 255), 1)
-
         # Draw the keyboard layout
         for i in range(26):
             ch = chr(i + ord('A'))
             pos = self.letter_positions[i]
             bg_color = self.letter_colors[i]
-            cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 2) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 3) * GRID)), bg_color, -1)
-            cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 2) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 3) * GRID)), (255, 255, 255), 1)
-            cv2.putText(image, ch, (int(pos[0] * GRID) + 15, int((pos[1] + 3) * GRID) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), bg_color, -1)
+            cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), (255, 255, 255), 1)
+            cv2.putText(image, ch, (int(pos[0] * GRID) + 15, int((pos[1] + 2) * GRID) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-        # Hightlight Row
-        if self.VISABLE_FEEDBACK:
-            if self.hl_L_row != None:
-                row = max(0.5, min(3.5, self.hl_L_row))
-                row_pixel = int((row - 0.5 + 2) * GRID)
+        # Visable feedback
+        if self.VISABLE_FEEDBACK == self.VISABLE_ALWAYS:
+            if self.L_row != None:
+                row = max(0.5, min(3.5, self.L_row))
+                row_pixel = int((row - 0.5 + 1) * GRID)
                 image[row_pixel-2:row_pixel+3,:5*GRID] *= 2
-            if self.hl_R_row != None:
-                row = max(0.5, min(3.5, self.hl_R_row))
-                row_pixel = int((row - 0.5 + 2) * GRID)
+            if self.R_row != None:
+                row = max(0.5, min(3.5, self.R_row))
+                row_pixel = int((row - 0.5 + 1) * GRID)
                 image[row_pixel-2:row_pixel+3,5*GRID:] *= 2
-            if self.hl_L_col != None:
-                col = max(0.5, min(2.5, self.hl_L_col))
+            if self.L_col != None:
+                col = max(0.5, min(2.5, self.L_col))
                 col_pixel = int((2.5 + col) * GRID)
-                image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
-            if self.hl_R_col != None:
-                col = max(0.5, min(2.5, self.hl_R_col))
+                image[1*GRID:4*GRID,col_pixel-2:col_pixel+3] *= 2
+            if self.R_col != None:
+                col = max(0.5, min(2.5, self.R_col))
                 col_pixel = int((7.5 - col) * GRID)
-                image[2*GRID:5*GRID,col_pixel-2:col_pixel+3] *= 2
+                image[1*GRID:4*GRID,col_pixel-2:col_pixel+3] *= 2
+        elif self.VISABLE_FEEDBACK == self.VISABLE_TOUCH:
+            pass
+        elif self.VISABLE_FEEDBACK == self.VISABLE_NO:
+            pass
 
         pg_img = pygame.surfarray.make_surface(cv2.transpose(image))
         self.screen.blit(pg_img, (0,0))
         pygame.display.flip()
 
-    def update_hightlight(self, hl_L_row, hl_L_col, hl_R_row, hl_R_col):
-        if hl_L_row != None:
-            self.hl_L_row = hl_L_row
-        if hl_L_col != None:
-            self.hl_L_col = hl_L_col
-        if hl_R_row != None:
-            self.hl_R_row = hl_R_row
-        if hl_R_col != None:
-            self.hl_R_col = hl_R_col
+    def update_hightlight(self, L_row, L_col, R_row, R_col):
+        if L_row != None:
+            self.L_row = L_row
+        if L_col != None:
+            self.L_col = L_col
+        if R_row != None:
+            self.R_row = R_row
+        if R_col != None:
+            self.R_col = R_col
     
     def next_phrase(self):
         self.curr_task_id += 1
@@ -179,27 +179,9 @@ class Keyboard:
         if i < len(task) and task[i] == ' ':
             self.inputted_text += ' '
     
-    def delete_a_word(self):
-        if len(self.inputted_text) > 0:
-            words = self.inputted_text.split()
-            if len(words) == 1:
-                self.inputted_text = ''
-            else:
-                self.inputted_text = ' '.join(words[:-1]) + ' '
-        self.init_candidates()
-    
     def delete_a_letter(self):
         if len(self.inputted_text) > 0:
             self.inputted_text = self.inputted_text[:-1]
-    
-    def enter_a_word(self, word):
-        if len(self.inputted_text) > 0 and len(word) > 0:
-            self.inputted_text += ' '
-        self.inputted_text += word
-        self.init_candidates()
-
-    def update_candidates(self, candidates):
-        self.candidates = candidates.copy()
 
     def word_correction(self, word):
         positions = []

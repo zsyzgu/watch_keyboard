@@ -15,25 +15,26 @@ class FingerTracker: # 1280 * 960
 
     def __init__(self, camera_id):
         self.init_fingertips()
+        self.init_touch()
         self.init_camera_para(camera_id)
+        self.init_endpoints()
+        self.init_highlight(camera_id)
     
     def init_fingertips(self):
         self.TIP_HEIGHT = 10 # Deal with two recognized points on a fingertip
         self.TIP_WIDTH = 180 # Max width of a tip (excluding thumb)
         self.THUMB_WIDTH = 300 # Max width of a thumb
-        self.SECOND_ROW_DELTA = 50 # The second row of the keyboard is x pixels lower than camera_cy
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
-        self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.finger_names = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinkie']
         self.fingertips = [[-1, -1]] * 5
-        self.endpoints = [[-1,-1]] * 5 # endpoint on the desk calned by touchpoint
+    
+    def init_touch(self):
+        self.THUMB_DELTA = 50 # The touching thumb is THUMB_DELTA pixels lower than camera_cy
+        self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.is_touch = [False for i in range(5)]
         self.is_touch_down = [False for i in range(5)]
         self.is_touch_up = [False for i in range(5)]
-        self.palm_line = 0 # The root of the middle finger (in y axis)
-        self.palm_line_dx = 0 # (dx,dy) = the vector between the groove of 2nd/3rd fingers and the groove of 3rd/4th fingers
-        self.palm_line_dy = 0
-
+    
     def init_camera_para(self, camera_id):
         assert(camera_id == 1 or camera_id == 2)
         self.camera_id = camera_id
@@ -43,6 +44,19 @@ class FingerTracker: # 1280 * 960
         self.fy = self.camera_mtx[1][1]
         self.cx = self.camera_mtx[0][2]
         self.cy = self.camera_mtx[1][2]
+
+    def init_endpoints(self):
+        self.endpoints = [[-1,-1]] * 5 # endpoint on the desk calned by touchpoint
+        self.palm_line = 0 # The root of the middle finger (in y axis)
+        self.palm_line_dx = 0 # (dx,dy) = the vector between the groove of 2nd/3rd fingers and the groove of 3rd/4th fingers
+        self.palm_line_dy = 0
+    
+    def init_highlight(self, camera_id):
+        pc = pickle.load(open(str(camera_id) + '.regist', 'rb'))
+        self.row_position = [np.mean(pc[r,:,1]) for r in range(3)]
+        self.col_position = [np.mean(pc[:,c,0]) for c in range(2)]
+        self.highlight_col = None
+        self.highlight_row = None
 
     def find_contours(self, frame, threshold):
         _, binary = cv2.threshold(frame, threshold, 255, cv2.THRESH_BINARY)
@@ -90,72 +104,6 @@ class FingerTracker: # 1280 * 960
 
         r = cv2.max(r1,r2)
         return r
-
-    def find_palm_line(self, image, brightness_threshold): # palm_line = the root of the middel finger
-        if self.fingertips[2][0] == -1:
-            return self.palm_line
-        
-        [x, y] = self.fingertips[2]
-        EDGE_L = max(x - 200, 0)
-        EDGE_R = min(x + 200, self.M - 1)
-        EDGE_D = min(y + 20, self.N - 1)
-
-        t=time.clock()
-        sub_image = image[:EDGE_D+1, EDGE_L:EDGE_R+1].copy()
-        sub_image[:2,:] = 255
-        sub_image = self.erode_fingers(sub_image, brightness_threshold)
-        contours = self.find_contours(sub_image, brightness_threshold)
-        contour = max(contours, key=cv2.contourArea)[:,0,:]
-        l = np.argmin(contour[:,0])
-        r = np.argmax(contour[:,0])
-        X = contour[l: r + 1, 0]
-        Y = contour[l: r + 1, 1]
-        mid = np.where(X == (x-EDGE_L))[0][0]
-
-        N = len(X)
-        radius = self.FINGER_RADIUS
-        l = max(0, mid - radius)
-        r = min(N-1, mid + radius)
-
-        cnt = 0
-        while (l - 1 >= 0 and cnt < 5):
-            if Y[l-1] < Y[l]:
-                cnt = 0
-            else:
-                cnt += 1
-            l -= 1
-        l += cnt
-
-        cnt = 0
-        while (r + 1 < N and cnt < 5):
-            if Y[r+1] < Y[r]:
-                cnt = 0
-            else:
-                cnt += 1
-            r += 1
-        r -= cnt
-        
-        xl, xr = X[l]+EDGE_L, X[r]+EDGE_L
-        yl, yr = Y[l], Y[r]
-        x = (xl + xr) // 2
-        y = (yl + yr) // 2
-
-        if self.camera_id == 2: # Right hand
-            missing = yr-yl > 60 or yl-yr > 10
-        else:
-            missing = yl-yr > 60 or yr-yl > 10
-        if missing:
-            if yl < yr:
-                x = xl + self.palm_line_dx // 2
-                y = yl + self.palm_line_dy // 2
-            else:
-                x = xr - self.palm_line_dx // 2
-                y = yr - self.palm_line_dy // 2
-        else:
-            self.palm_line_dx = xr - xl
-            self.palm_line_dy = yr - yl
-
-        return y
 
     def find_fingertips(self, image, contours):
         fingers = self.find_fingers(contours)
@@ -312,7 +260,7 @@ class FingerTracker: # 1280 * 960
         
         if self.fingertips[0][0] != -1: # The thumb
             x, y = self.fingertips[0][0], self.fingertips[0][1]
-            self.is_touch[0] = (y >= self.cy + self.SECOND_ROW_DELTA)
+            self.is_touch[0] = (y >= self.cy + self.THUMB_DELTA)
         if len(touch_line) > 0:
             for i in range(1, 5): # Not the thumb
                 if self.fingertips[i][0] != -1:
@@ -345,6 +293,89 @@ class FingerTracker: # 1280 * 960
             else:
                 self.endpoints[i] = [-1, -1]
 
+    def find_palm_line(self, image, brightness_threshold): # palm_line = the root of the middel finger
+        if self.fingertips[2][0] == -1:
+            return self.palm_line
+        
+        [x, y] = self.fingertips[2]
+        EDGE_L = max(x - 200, 0)
+        EDGE_R = min(x + 200, self.M - 1)
+        EDGE_D = min(y + 20, self.N - 1)
+
+        t=time.clock()
+        sub_image = image[:EDGE_D+1, EDGE_L:EDGE_R+1].copy()
+        sub_image[:2,:] = 255
+        sub_image = self.erode_fingers(sub_image, brightness_threshold)
+        contours = self.find_contours(sub_image, brightness_threshold)
+        contour = max(contours, key=cv2.contourArea)[:,0,:]
+        l = np.argmin(contour[:,0])
+        r = np.argmax(contour[:,0])
+        X = contour[l: r + 1, 0]
+        Y = contour[l: r + 1, 1]
+        mid = np.where(X == (x-EDGE_L))[0][0]
+
+        N = len(X)
+        radius = self.FINGER_RADIUS
+        l = max(0, mid - radius)
+        r = min(N-1, mid + radius)
+
+        cnt = 0
+        while (l - 1 >= 0 and cnt < 5):
+            if Y[l-1] < Y[l]:
+                cnt = 0
+            else:
+                cnt += 1
+            l -= 1
+        l += cnt
+
+        cnt = 0
+        while (r + 1 < N and cnt < 5):
+            if Y[r+1] < Y[r]:
+                cnt = 0
+            else:
+                cnt += 1
+            r += 1
+        r -= cnt
+        
+        xl, xr = X[l]+EDGE_L, X[r]+EDGE_L
+        yl, yr = Y[l], Y[r]
+        x = (xl + xr) // 2
+        y = (yl + yr) // 2
+
+        if self.camera_id == 2: # Right hand
+            missing = yr-yl > 60 or yl-yr > 10
+        else:
+            missing = yl-yr > 60 or yr-yl > 10
+        if missing:
+            if yl < yr:
+                x = xl + self.palm_line_dx // 2
+                y = yl + self.palm_line_dy // 2
+            else:
+                x = xr - self.palm_line_dx // 2
+                y = yr - self.palm_line_dy // 2
+        else:
+            self.palm_line_dx = xr - xl
+            self.palm_line_dy = yr - yl
+
+        return y
+
+    def calc_highlight(self):
+        if self.palm_line > self.row_position[1]:
+            row = 2 - (self.palm_line - self.row_position[1]) / (self.row_position[0] - self.row_position[1])
+        else:
+            row = 2 + (self.palm_line - self.row_position[1]) / (self.row_position[2] - self.row_position[1])
+        
+        col = None
+        if self.fingertips[1][0] != -1:
+            X = self.fingertips[1][0]
+            z = 16.0 - row * 2
+            x = (X - self.cx) / self.fx * z
+            col = 2 - (x - self.col_position[0]) / (self.col_position[1] - self.col_position[0])
+        
+        self.highlight_row = row = max(0.5, min(3.5, row))
+        if col != None:
+            self.highlight_col = col = max(0.5, min(3.5, col))
+
     def run(self, image):
         self.N, self.M = image.shape[:2]
         self.image = image
@@ -374,6 +405,7 @@ class FingerTracker: # 1280 * 960
         self.calc_touch(touch_line)
         self.calc_endpoints()
         self.palm_line = self.find_palm_line(gray, brightness_threshold)
+        self.calc_highlight()
 
         # Save intermediate result
         self.illustration = gray
