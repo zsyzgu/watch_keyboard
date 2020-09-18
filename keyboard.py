@@ -8,6 +8,9 @@ from PIL import Image, ImageFont, ImageDraw
 
 class Keyboard:
     GRID = 50
+    TASK_NUM = 20
+    CORPUS_NUM = 20000
+
     VISABLE_NO = 0
     VISABLE_TOUCH = 1
     VISABLE_ALWAYS = 2
@@ -57,19 +60,19 @@ class Keyboard:
         self.task_list = []
         self.curr_task_id = 0
 
-        lines = open(path).readlines()[0:20]
+        lines = open(path).readlines()[0:self.TASK_NUM]
         for line in lines:
             line = line.lower()
             self.task_list.append(line.strip('\n'))
 
         random.shuffle(self.task_list)
+        self.task = self.task_list[self.curr_task_id]
 
     def init_corpus(self):
         if self.WORD_CORRECTION:
             self.corpus = []
             lines = open('corpus.txt').readlines()
-            CORPUS_AMOUNT = 20000
-            for i in range(CORPUS_AMOUNT):
+            for i in range(self.CORPUS_NUM):
                 line = lines[i]
                 tags = line.strip().split(' ')
                 word = tags[0]
@@ -96,7 +99,7 @@ class Keyboard:
         cv2.rectangle(image, (0, 0), (10 * GRID, GRID - 1), (0, 0, 0), -1)
 
         # Draw task and inputted text
-        cv2.putText(image, self.task_list[self.curr_task_id], (int(GRID * 0.5), int(GRID * 0.4)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(image, self.task, (int(GRID * 0.5), int(GRID * 0.4)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         cv2.putText(image, self.inputted_text + '_', (int(GRID * 0.5), int(GRID * 0.8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         # Draw the keyboard layout
@@ -149,6 +152,7 @@ class Keyboard:
         if self.curr_task_id >= len(self.task_list):
             self.curr_task_id = 0
             return False
+        self.task = self.task_list[self.curr_task_id]
         return True
 
     def redo_phrase(self):
@@ -157,11 +161,12 @@ class Keyboard:
 
     def enter_a_letter(self, input_data, input_letter):
         i = len(self.inputted_text)
-        task = self.task_list[self.curr_task_id]
         letter = ''
-        if i < len(task):
+        if i < len(self.task):
             if self.WORD_CORRECTION == self.CORRECT_LETTER:
-                letter = task[i]
+                if self.task[i] == ' ': # can not enter space by inputting letter, when CORRECT_LETTER
+                    return ''
+                letter = self.task[i]
             else:
                 letter = input_letter
             self.inputted_text += letter
@@ -171,15 +176,14 @@ class Keyboard:
 
     def enter_a_space(self, input_data):
         i = len(self.inputted_text)
-        task = self.task_list[self.curr_task_id]
         if self.WORD_CORRECTION == self.CORRECT_WORD:
             tags = self.inputted_text.split(' ')
             if len(tags) > 0 and tags[-1] != '':
                 word = self.word_correction(self.inputted_data[-len(tags[-1]):])
-                assert(len(tags[-1]) == len(word))
-                tags[-1] = word
+                if word != '': # '' means no match
+                    tags[-1] = word
                 self.inputted_text = ' '.join(tags)
-        if i < len(task):
+        if i < len(self.task):
             self.inputted_text += ' '
             self.inputted_data.append(input_data)
     

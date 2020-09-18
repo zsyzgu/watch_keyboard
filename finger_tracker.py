@@ -159,7 +159,7 @@ class FingerTracker: # 1280 * 960
                 else:
                     w_thres = self.TIP_WIDTH
 
-                if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)) and r-l>=20:
+                if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)) and r-l>=w_thres//8:
                     [x,y] = [X[mid],Y[mid]]
                     if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
                         if maybe_thumb:
@@ -302,7 +302,6 @@ class FingerTracker: # 1280 * 960
         EDGE_R = min(x + 200, self.M - 1)
         EDGE_D = min(y + 20, self.N - 1)
 
-        t=time.clock()
         sub_image = image[:EDGE_D+1, EDGE_L:EDGE_R+1].copy()
         sub_image[:2,:] = 255
         sub_image = self.erode_fingers(sub_image, brightness_threshold)
@@ -360,11 +359,11 @@ class FingerTracker: # 1280 * 960
         return y
 
     def calc_highlight(self):
+        '''
         if self.palm_line > self.row_position[1]: # Linear Model
             row = 2 - (self.palm_line - self.row_position[1]) / (self.row_position[0] - self.row_position[1])
         else:
             row = 2 + (self.palm_line - self.row_position[1]) / (self.row_position[2] - self.row_position[1])
-
         '''
         if self.palm_line > self.row_position[1]: # Two Sticks Model: a + b * row = z = (H * fy) / (palm_line - cy)
             a = self.camera_H * self.fy / (self.row_position[0] - self.cy)
@@ -374,7 +373,6 @@ class FingerTracker: # 1280 * 960
             a = self.camera_H * self.fy / (self.row_position[1] - self.cy)
             b = self.camera_H * self.fy / (self.row_position[2] - self.cy) - a
             row = (self.camera_H * self.fy / (self.palm_line - self.cy) - a) / b + 2
-        '''
         
         col = None
         if self.fingertips[1][0] != -1:
