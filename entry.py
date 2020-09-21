@@ -5,7 +5,6 @@ import time
 import io
 import os
 import pygame
-pygame.init()
 from keyboard import Keyboard
 from finger_tracker import FingerTracker
 import pickle
@@ -13,7 +12,8 @@ import sys
 
 class Exp:
     def __init__(self):
-        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_LETTER)
+        pygame.init()
+        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_WORD)
         self.tracker_L = FingerTracker(1)
         self.tracker_R = FingerTracker(2)
         self.init_camera()
@@ -70,7 +70,7 @@ def calc_letter(keyboard, input_data):
 
     return '#'
 
-class Exp3(Exp):
+class Exp1(Exp):
     def __init__(self):
         super().__init__()
 
@@ -170,5 +170,5 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print('[Usage] python entry.py save_folder')
         exit()
-    exp = Exp3()
+    exp = Exp1()
     exp.run()

@@ -21,51 +21,58 @@ class Keyboard:
     def __init__(self, VISABLE_FEEDBACK = VISABLE_ALWAYS, WORD_CORRECTION = CORRECT_WORD):
         self.VISABLE_FEEDBACK = VISABLE_FEEDBACK
         self.WORD_CORRECTION = WORD_CORRECTION
-        self.init_letter_positions()
+        self.init_letter_info()
         self.init_task_list('phrases.txt')
         self.init_corpus()
         self.init_inputted_data()
         self.init_display()
     
-    def init_letter_positions(self):
+    def init_letter_info(self):
         QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
         FINGER_PINKIE = 'QAZ|P'
         FINGER_RING = 'WSX|OL'
         FINGER_MIDDLE = 'EDC|IK'
         FINGER_INDEX_L = 'RFV|TGB'
         FINGER_INDEX_R = 'YHN|UJM'
+
         self.letter_positions = [[-1, -1] for i in range(26)]
-        self.letter_colors = [(0,0,0) for i in range(26)]
+        self.letter_distributions = [[-1, -1, 0.1, 0.1, 0.1, 0] for i in range(26)] # Formal = [xc, yc, std_x2, std_y2, std_xy, p]
         for r in range(3):
             line = QWERTY[r]
             for c in range(len(line)):
                 ch = line[c]
                 index = ord(ch) - ord('A')
                 self.letter_positions[index] = [c, r]
-                color = (0,0,0)
-                I = 64
-                if ch in FINGER_PINKIE:
-                    color = (0,I,0)
-                elif ch in FINGER_RING:
-                    color = (I,0,I)
-                elif ch in FINGER_MIDDLE:
-                    color = (I,I,0)
-                elif ch in FINGER_INDEX_L:
-                    color = (0,I,I)
-                elif ch in FINGER_INDEX_R:
-                    color = (0,0,I)
-                self.letter_colors[index] = color
+                self.letter_distributions[index][:2] = [c, r]
+        
+        self.letter_colors = [(0,0,0) for i in range(26)]
+        for index in range(26):
+            ch = chr(index + ord('A'))
+            color = (0,0,0)
+            I = 64
+            if ch in FINGER_PINKIE:
+                color = (0,I,0)
+            elif ch in FINGER_RING:
+                color = (I,0,I)
+            elif ch in FINGER_MIDDLE:
+                color = (I,I,0)
+            elif ch in FINGER_INDEX_L:
+                color = (0,I,I)
+            elif ch in FINGER_INDEX_R:
+                color = (0,0,I)
+            self.letter_colors[index] = color
 
     def init_task_list(self, path):
         self.task_list = []
         self.curr_task_id = 0
 
-        lines = open(path).readlines()[0:self.TASK_NUM]
+        lines = open(path).readlines()
         for line in lines:
             line = line.lower()
             self.task_list.append(line.strip('\n'))
 
         random.shuffle(self.task_list)
+        self.task_list = self.task_list[:self.TASK_NUM]
         self.task = self.task_list[self.curr_task_id]
 
     def init_corpus(self):
@@ -105,7 +112,7 @@ class Keyboard:
         # Draw the keyboard layout
         for i in range(26):
             ch = chr(i + ord('A'))
-            pos = self.letter_positions[i]
+            pos = self.letter_distributions[i][:2]
             bg_color = self.letter_colors[i]
             cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), bg_color, -1)
             cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), (255, 255, 255), 1)
@@ -219,14 +226,16 @@ class Keyboard:
         best_candidate = ''
         for i in range(N):
             (candidate, pri) = self.corpus[i]
-            if len(candidate) == len(inputted_data):
-                for j in range(len(inputted_data)):
+            if len(candidate) == len(positions):
+                for j in range(len(positions)):
                     letter = candidate[j]
                     index = ord(letter) - ord('a')
-                    position = self.letter_positions[index]
-                    dx = position[0] - positions[j][0]
-                    dy = position[1] - positions[j][1]
-                    pri *= math.exp(-((2*dx)**2+(2*dy)**2))
+                    [x, y] = positions[j]
+                    [xc, yc, std_x2, std_y2, std_xy, p] = self.letter_distributions[index]
+                    dx = x - xc
+                    dy = y - yc
+                    z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
+                    pri *= ((2 * math.pi * std_xy * ((1 - p ** 2) ** 0.5)) ** -1) * math.exp(-z / (2 * (1 - p ** 2)))
                 if pri > max_pri:
                     max_pri = pri
                     best_candidate = candidate
