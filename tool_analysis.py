@@ -44,7 +44,7 @@ class Illustration:
 
         fig, ax = plt.subplots()
         for ch in range(26):
-            if len(points[ch]) > 0:
+            if len(points[ch]) > 2:
                 X = np.array(points[ch])[:,0]
                 Y = np.array(points[ch])[:,1]
 
@@ -101,7 +101,7 @@ class Simulation:
             fig, ax = plt.subplots()
             ans = []
             for index in range(26):
-                if len(points[index]) > 0:
+                if len(points[index]) >= 2:
                     X = np.array(points[index])[:,0]
                     Y = np.array(points[index])[:,1]
 
