@@ -129,19 +129,18 @@ def record(camera_id):
         finger = max(1, col)
         correct = tracker.is_touch_down[finger]
         if correct:
-            frames.append(frame)
+            x = tracker.endpoints[finger][0]
+            y = tracker.palm_line
+            frames.append([frame, x, y])
             index += 1
             if index == 150:
                 break
-        
 
         visaul.draw()
     
     return frames
 
 def calc(camera_id, frames):
-    tracker = FingerTracker(camera_id)
-
     pc = np.zeros((3, 5, 5))
     fig, ax = plt.subplots()
 
@@ -154,25 +153,32 @@ def calc(camera_id, frames):
                 row = int((index % 15) // 5)
                 col = int(index % 5)
                 if row == r and col == c:
-                    frame = frames[index]
-                    #frame = cv2.imread('raw/' + str(iteration) + '_' + str(r) + '_' + str(c) + '.jpg')
-                    tracker.run(frame)
-                    output = tracker.output(str(index))
-                    cv2.imshow('illustration', output)
-                    cv2.waitKey(1)
-                    for i in range(5):
-                        if tracker.is_touch[i]:
-                            x = tracker.endpoints[i][0]
-                            y = tracker.palm_line#tracker.endpoints[i][1]
-                            X.append(x)
-                            Y.append(y)
+                    [frame, x, y] = frames[index]
+                    X.append(x)
+                    Y.append(y)
+                            
+            n_std = 3
             X = np.array(X)
             Y = np.array(Y)
             assert(len(X) > 0)
-            n_std = 3
+            print('R = %d, C = %d, NUM = %d' % (r,c,len(X)))
             (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
             xc, yc = center
             ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+
+            new_X = [] # Remove bad points & calc once more
+            new_Y = []
+            for i in range(len(X)):
+                x, y = X[i], Y[i]
+                if ell.contains_point([x,y]):
+                    new_X.append(x)
+                    new_Y.append(y)
+            X = new_X
+            Y = new_Y
+            (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
+            xc, yc = center
+            ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+
             index = r * 5 + c + 1
             plt.scatter(X, Y, color=('C'+str(index)), s = 5)
             plt.scatter(xc, yc, color='red', s = 10)
@@ -190,4 +196,6 @@ if __name__ == "__main__":
     camera_id = int(sys.argv[1])
     assert(1 <= camera_id and camera_id <= 2)
     frames = record(camera_id)
+    #frames = pickle.load(open('debug.pickle','rb'))
+    pickle.dump(frames,open('debug.pickle','wb'))
     calc(camera_id, frames)

@@ -77,6 +77,8 @@ class Exp1(Exp):
         self.save_folder = save_folder = 'data/' + sys.argv[1] + '/'
         if not os.path.exists(save_folder):
             os.makedirs(save_folder)
+        else:
+            print('\033[1;31;40m[Warning]\033[0m Folder exists')
         if not os.path.exists(save_folder + 'L/'):
             os.makedirs(save_folder + 'L/')
         if not os.path.exists(save_folder + 'R/'):
@@ -137,7 +139,7 @@ class Exp1(Exp):
             input_data = self.pack_input_data()
             keys = self.get_keyboard_events()
 
-            if (len(input_data) > 0 and input_data[:2] == ['R', 0]) or pygame.K_SPACE in keys: # Enter a space (R - Thumb)
+            if (len(input_data) > 0 and input_data[:2] == ['L', 0]) or pygame.K_SPACE in keys: # Enter a space (R - Thumb)
                 self.keyboard.enter_a_space(input_data)
                 end_time = time.clock()
             
@@ -152,7 +154,7 @@ class Exp1(Exp):
                 else:
                     self.keyboard.delete_a_letter()
             
-            if (len(input_data) > 0 and input_data[:2] == ['L', 0]) or pygame.K_n in keys: # Next phrase (L - Thumb)
+            if (len(input_data) > 0 and input_data[:2] == ['R', 0]) or pygame.K_n in keys: # Next phrase (L - Thumb)
                 if len(self.keyboard.inputted_text) == len(self.keyboard.task):
                     wpm = (len(self.keyboard.inputted_text)-1)/((end_time - start_time)/60.0)/5.0
                     print('WPM = ', wpm)

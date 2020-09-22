@@ -195,24 +195,24 @@ class Simulation:
         for i in range(N):
             [task, inputted, data] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
 
-            if inputted != task:
-                print('Error')
-                continue
-
             words = []
             points = []
             truth = ''
+            enter = ''
             for j in range(len(task) + 1):
                 if j < len(task) and task[j].isalpha():
                     pos = self.get_position(data[j])
                     points.append(pos)
                     truth += task[j]
+                    enter += inputted[j]
                 else:
-                    pred, rank = self.predict(points, truth)
-                    words.append(pred)
-                    ranks.append(rank)
+                    if truth == enter: # Judge if space entered in this word
+                        pred, rank = self.predict(points, truth)
+                        words.append(pred)
+                        ranks.append(rank)
                     points = []
                     truth = ''
+                    enter = ''
 
         print('=====   Top-5 accuracy   =====')
         ranks = np.array(ranks)
