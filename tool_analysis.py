@@ -6,6 +6,7 @@ from matplotlib.patches import Ellipse
 from astroML.stats import fit_bivariate_normal
 from astroML.stats.random import bivariate_normal
 import math
+import os
 
 class Simulation:
     LETTER_DISTRIBUTION_LAYOUT = 0
@@ -35,16 +36,19 @@ class Simulation:
                     index = ord(ch) - ord('A')
                     self.letter_distributions[index][:2] = [c, r]
         if mode == self.LETTER_DISTRIBUTION_STAT: # set letter distribution according to statistic analysis
-            data = kwargs['data']
-            task = kwargs['task']
-            assert(len(data) == len(task))
+            data_list = kwargs['data_list']
+            task_list = kwargs['task_list']
             points = [[] for ch in range(26)]
-            for i in range(len(task)):
-                letter = task[i]
-                if letter.isalpha():
-                    index = ord(letter) - ord('a')
-                    position = self.get_position(data[i])
-                    points[index].append(position)
+
+            assert(len(data_list) == len(task_list))
+            for data, task in zip(data_list, task_list):
+                assert(len(data) == len(task))
+                for i in range(len(task)):
+                    letter = task[i]
+                    if letter.isalpha():
+                        index = ord(letter) - ord('a')
+                        position = self.get_position(data[i])
+                        points[index].append(position)
             
             fig, ax = plt.subplots()
             ans = []
@@ -52,11 +56,13 @@ class Simulation:
                 if len(points[index]) >= 2:
                     X = np.array(points[index])[:,0]
                     Y = np.array(points[index])[:,1]
-
                     n_std = 3
+
                     (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=False)
                     xc, yc = center
                     ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+
+                    # TODO: exclude >3_std
 
                     plt.scatter(X, Y, color=('C'+str(index)), s = 5)
                     plt.scatter(xc, yc, color='red', s = 10)
@@ -127,39 +133,58 @@ class Simulation:
 
         return best_candidate, rank
 
-    def run(self):
-        folder_path = 'data/' + sys.argv[1] + '/'
-        N = 20
+    def input(self):
+        nums = sys.argv[1].split('-')
+        assert(len(nums) == 2)
+        if nums[0].isdigit():
+            users = [int(nums[0])]
+        else:
+            users = range(1, 13)
+        if nums[1].isdigit():
+            sessions = [int(nums[1])]
+        else:
+            sessions = range(1, 6)
 
-        total_task = ''
-        total_data = []
-        for i in range(N):
-            [task, inputted, data_list] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
-            M = len(task)
-            assert(len(inputted) == M and len(data_list) == M)
-            total_task += task
-            total_data.extend(data_list)
-        self.calc_letter_distribution(mode=self.LETTER_DISTRIBUTION_STAT, data=total_data, task=total_task)
+        N = 20
+        task_list = []
+        inputted_list = []
+        data_list = []
+
+        for user in users:
+            for session in sessions:
+                folder_path = 'data/' + str(user) + '-' + str(session) + '/'
+                for i in range(N):
+                    file_path = folder_path + str(i) + '.pickle'
+                    if os.path.exists(file_path):
+                        [task, inputted, data] = pickle.load(open(file_path, 'rb'))
+                        assert(len(inputted) == len(data) and len(data) == len(data))
+                        task_list.append(task)
+                        inputted_list.append(inputted)
+                        data_list.append(data)
+        
+        return task_list, inputted_list, data_list
+
+    def run(self):
+        task_list, inputted_list, data_list = self.input()
+        self.calc_letter_distribution(mode=self.LETTER_DISTRIBUTION_STAT, data_list=data_list, task_list=task_list)
 
         ranks = []
         fail_cases = []
-        for i in range(N):
-            [task, inputted, data_list] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
-
+        for task, inputted, data in zip(task_list, inputted_list, data_list):
             words = task.split()
             begin = 0
             for word in words:
                 end = begin + len(word)
                 
                 enter = inputted[begin:end]
-                data = data_list[begin:end]
-                points = [self.get_position(d) for d in data]
+                word_data = data[begin:end]
+                points = [self.get_position(w) for w in word_data]
                 if enter == word:
                     pred, rank = self.predict(points, word)
                     ranks.append(rank)
                     if pred != word:
                         print('[Fail Cases]', word, pred)
-                        fail_cases.append([word, data])
+                        fail_cases.append([word, word_data])
 
                 begin = end + 1
 
@@ -187,7 +212,7 @@ class Debug:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print('[Usage] python tool_analysis.py folder_name')
+        print('[Usage] python tool_analysis.py folder_name(x-x)')
         exit()
     Simulation().run()
     #Debug().run()
