@@ -7,58 +7,6 @@ from astroML.stats import fit_bivariate_normal
 from astroML.stats.random import bivariate_normal
 import math
 
-class Illustration:
-    def get_position(self, data): # get position from inputted data
-        [side, index, highlight_row, highlight_col] = data[:4]
-        #row = max(0-0.5,min(2+0.5,highlight_row - 1))
-        #col = max(0-0.5,min(1+0.5,highlight_col - 1))
-        row = max(0-1,min(2+1,highlight_row - 1))
-        col = max(0-1,min(1+1,highlight_col - 1))
-        if side == 'L':
-            if index == 1:
-                col = 3 + col
-            else:
-                col = 3 - (index - 1)
-        if side == 'R':
-            if index == 1:
-                col = 6 - col
-            else:
-                col = 6 + (index - 1)
-        return [col, row]
-
-    def run(self):
-        folder_path = 'data/' + sys.argv[1] + '/'
-        N = 20
-        points = [[] for ch in range(26)]
-        for i in range(N):
-            [task, inputted, data] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
-            M = len(task)
-            assert(len(inputted) == M and len(data) == M)
-
-            for j in range(M):
-                if task[j].isalpha():
-                    ch = ord(task[j]) - ord('a')
-                    #[side, which_finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data[j]
-                    pos = self.get_position(data[j])
-                    points[ch].append(pos)
-
-        fig, ax = plt.subplots()
-        for ch in range(26):
-            if len(points[ch]) > 2:
-                X = np.array(points[ch])[:,0]
-                Y = np.array(points[ch])[:,1]
-
-                n_std = 3
-                (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
-                xc, yc = center
-                ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
-                plt.scatter(X, Y, color=('C'+str(ch)), s = 5)
-                plt.scatter(xc, yc, color='red', s = 10)
-                ax.add_patch(ell)
-            else:
-                print('lack of', chr(ch + ord('a')))
-        plt.show()
-
 class Simulation:
     LETTER_DISTRIBUTION_LAYOUT = 0
     LETTER_DISTRIBUTION_STAT = 1
@@ -105,10 +53,11 @@ class Simulation:
                     X = np.array(points[index])[:,0]
                     Y = np.array(points[index])[:,1]
 
-                    n_std = 1
+                    n_std = 3
                     (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=False)
                     xc, yc = center
                     ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+
                     plt.scatter(X, Y, color=('C'+str(index)), s = 5)
                     plt.scatter(xc, yc, color='red', s = 10)
                     ax.add_patch(ell)
@@ -141,8 +90,8 @@ class Simulation:
                 col = 6 - col
             else:
                 col = 6 + (index - 1)
+            col += 1
         return [col, row]
-        #return [endpoint_x, endpoint_y]
         #return [endpoint_x, palm_line]
 
     def predict(self, positions, truth):
@@ -161,7 +110,8 @@ class Simulation:
                     dx = x - xc
                     dy = y - yc
                     z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                    pri *= ((2 * math.pi * std_xy * ((1 - p ** 2) ** 0.5)) ** -1) * math.exp(-z / (2 * (1 - p ** 2)))
+                    prob = ((2 * math.pi * std_xy * ((1 - p ** 2) ** 0.5)) ** -1) * math.exp(-z / (2 * (1 - p ** 2)))
+                    pri *= prob
                 if pri > max_pri:
                     max_pri = pri
                     best_candidate = candidate
@@ -184,45 +134,60 @@ class Simulation:
         total_task = ''
         total_data = []
         for i in range(N):
-            [task, inputted, data] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
+            [task, inputted, data_list] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
             M = len(task)
-            assert(len(inputted) == M and len(data) == M)
+            assert(len(inputted) == M and len(data_list) == M)
             total_task += task
-            total_data.extend(data)
+            total_data.extend(data_list)
         self.calc_letter_distribution(mode=self.LETTER_DISTRIBUTION_STAT, data=total_data, task=total_task)
 
         ranks = []
+        fail_cases = []
         for i in range(N):
-            [task, inputted, data] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
+            [task, inputted, data_list] = pickle.load(open(folder_path + str(i) + '.pickle', 'rb'))
 
-            words = []
-            points = []
-            truth = ''
-            enter = ''
-            for j in range(len(task) + 1):
-                if j < len(task) and task[j].isalpha():
-                    pos = self.get_position(data[j])
-                    points.append(pos)
-                    truth += task[j]
-                    enter += inputted[j]
-                else:
-                    if truth == enter: # Judge if space entered in this word
-                        pred, rank = self.predict(points, truth)
-                        words.append(pred)
-                        ranks.append(rank)
-                    points = []
-                    truth = ''
-                    enter = ''
+            words = task.split()
+            begin = 0
+            for word in words:
+                end = begin + len(word)
+                
+                enter = inputted[begin:end]
+                data = data_list[begin:end]
+                points = [self.get_position(d) for d in data]
+                if enter == word:
+                    pred, rank = self.predict(points, word)
+                    ranks.append(rank)
+                    if pred != word:
+                        print('[Fail Cases]', word, pred)
+                        fail_cases.append([word, data])
+
+                begin = end + 1
 
         print('=====   Top-5 accuracy   =====')
         ranks = np.array(ranks)
         for rank in range(1, 6):
             print(sum(ranks == rank) / len(ranks))
-            
+        
+        pickle.dump([self, fail_cases], open('debug.pickle', 'wb'))
+
+class Debug:
+    def __init__(self):
+        pass
+
+    def run(self):
+        [sim, fail_cases] = pickle.load(open('debug.pickle', 'rb'))
+
+        for [word, data] in fail_cases:
+            points = np.array([sim.get_position(d) for d in data])
+            plt.scatter(points[:,0], points[:,1])
+            plt.show()
+            pred, rank = sim.predict(points, word)
+            print(word, pred)
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print('[Usage] python tool_analysis.py folder_name')
         exit()
-    #Illustration().run()
     Simulation().run()
+    #Debug().run()

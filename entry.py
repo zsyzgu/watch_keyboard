@@ -13,7 +13,7 @@ import sys
 class Exp:
     def __init__(self):
         pygame.init()
-        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_LETTER)
+        self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_WORD)
         self.tracker_L = FingerTracker(1)
         self.tracker_R = FingerTracker(2)
         self.init_camera()

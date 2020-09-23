@@ -145,6 +145,7 @@ def calc(camera_id, frames):
     fig, ax = plt.subplots()
 
     for r in range(3):
+        print(r)
         for c in range(5):
             X = []
             Y = []
@@ -166,6 +167,7 @@ def calc(camera_id, frames):
             xc, yc = center
             ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
 
+            '''
             new_X = [] # Remove bad points & calc once more
             new_Y = []
             for i in range(len(X)):
@@ -178,6 +180,7 @@ def calc(camera_id, frames):
             (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
             xc, yc = center
             ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+            '''
 
             index = r * 5 + c + 1
             plt.scatter(X, Y, color=('C'+str(index)), s = 5)
@@ -195,7 +198,7 @@ if __name__ == "__main__":
         exit()
     camera_id = int(sys.argv[1])
     assert(1 <= camera_id and camera_id <= 2)
-    frames = record(camera_id)
-    #frames = pickle.load(open('debug.pickle','rb'))
+    #frames = record(camera_id)
+    frames = pickle.load(open('debug.pickle','rb'))
     pickle.dump(frames,open('debug.pickle','wb'))
     calc(camera_id, frames)
