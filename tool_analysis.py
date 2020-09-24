@@ -63,6 +63,18 @@ class Simulation:
                     ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
 
                     # TODO: exclude >3_std
+                    '''
+                    pack = zip(X.copy(), Y.copy())
+                    X = []
+                    Y = []
+                    for x, y in pack:
+                        if ell.contains_point([x, y]):
+                            X.append(x)
+                            Y.append(y)
+                    (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=False)
+                    xc, yc = center
+                    ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
+                    '''
 
                     plt.scatter(X, Y, color=('C'+str(index)), s = 5)
                     plt.scatter(xc, yc, color='red', s = 10)
@@ -98,7 +110,7 @@ class Simulation:
                 col = 6 + (index - 1)
             col += 1
         return [col, row]
-        #return [endpoint_x, palm_line]
+        #return [endpoint_x, endpoint_y]
 
     def predict(self, positions, truth):
         N = len(self.corpus)

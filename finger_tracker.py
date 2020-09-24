@@ -22,8 +22,10 @@ class FingerTracker: # 1280 * 960
     
     def init_fingertips(self):
         self.TIP_HEIGHT = 10 # Deal with two recognized points on a fingertip
-        self.TIP_WIDTH = 180 # Max width of a tip (excluding thumb)
-        self.THUMB_WIDTH = 300 # Max width of a thumb
+        self.TIP_MAX_WIDTH = 180 # Max/Min width of a tip (excluding thumb)
+        self.TIP_MIN_WIDTH = 20
+        self.THUMB_MAX_WIDTH = 300 # Max/Min width of a thumb
+        self.THUMB_MIN_WIDTH = 50
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
         self.finger_names = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinkie']
         self.fingertips = [[-1, -1]] * 5
@@ -38,12 +40,17 @@ class FingerTracker: # 1280 * 960
     def init_camera_para(self, camera_id):
         assert(camera_id == 1 or camera_id == 2)
         self.camera_id = camera_id
+        self.N, self.M = 960, 1280
         [self.map1, self.map2, self.roi, self.camera_mtx] = pickle.load(open(str(camera_id) + '.calib', 'rb'))
         self.camera_H = 0.75
         self.fx = self.camera_mtx[0][0]
         self.fy = self.camera_mtx[1][1]
         self.cx = self.camera_mtx[0][2]
         self.cy = self.camera_mtx[1][2]
+        self.intensity_mask = np.zeros((self.N,self.M), dtype=np.float32) # Light up the two sides of the image
+        for i in range(0,self.M):
+            tan_theta = (math.tan((120. / 2) * math.pi / 180.)) * (i - self.cx) / (self.M // 2) # FOV = 110 degrees
+            self.intensity_mask[:,i] = (1 + tan_theta ** 2) ** 0.5
 
     def init_endpoints(self):
         self.endpoints = [[-1,-1]] * 5 # endpoint on the desk calned by touchpoint
@@ -85,9 +92,9 @@ class FingerTracker: # 1280 * 960
     def find_brightness_threshold(self):
         if self.FIXED_BRIGHTNESS:
             if self.camera_id == 1:
-                return 53
+                return 55
             if self.camera_id == 2:
-                return 53
+                return 55
 
     def erode_fingers(self, image, brightness_threshold):
         kernel = np.uint8(np. ones((1, 3)))
@@ -148,18 +155,20 @@ class FingerTracker: # 1280 * 960
             for i in range(len(ids)): # Judge finger height and width
                 id = ids[i]
                 l = r = id
-                while (l - 1 >= 0 and Y[l - 1] >= Y[id] - self.TIP_HEIGHT and r-l<=self.THUMB_WIDTH):
+                while (l - 1 >= 0 and Y[l - 1] >= Y[id] - self.TIP_HEIGHT and r-l<=self.THUMB_MAX_WIDTH):
                     l -= 1
-                while (r + 1 < point_num and Y[r + 1] >= Y[id] - self.TIP_HEIGHT and r-l<=self.THUMB_WIDTH):
+                while (r + 1 < point_num and Y[r + 1] >= Y[id] - self.TIP_HEIGHT and r-l<=self.THUMB_MAX_WIDTH):
                     r += 1
                 mid = (l + r) // 2
 
                 if maybe_thumb:
-                    w_thres = self.THUMB_WIDTH
+                    max_width = self.THUMB_MAX_WIDTH
+                    min_width = self.THUMB_MIN_WIDTH
                 else:
-                    w_thres = self.TIP_WIDTH
+                    max_width = self.TIP_MAX_WIDTH
+                    min_width = self.TIP_MIN_WIDTH
 
-                if r - l <= w_thres and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)) and r-l>=w_thres//8:
+                if r - l <= max_width and r - l >= min_width and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)):
                     [x,y] = [X[mid],Y[mid]]
                     if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
                         if maybe_thumb:
@@ -386,9 +395,10 @@ class FingerTracker: # 1280 * 960
             self.highlight_col = col = max(0.5, min(3.5, col))
 
     def run(self, image):
-        self.N, self.M = image.shape[:2]
+        assert(self.N == image.shape[0] and self.M == image.shape[1])
         self.image = image
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        gray = cv2.multiply(gray, self.intensity_mask, dtype=cv2.CV_8U) # Light up the two sides of the image
         brightness_threshold = self.find_brightness_threshold()
         _, gray = cv2.threshold(gray, brightness_threshold, 255, type=cv2.THRESH_TOZERO)
 
