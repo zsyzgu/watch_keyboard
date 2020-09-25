@@ -23,7 +23,7 @@ class FingerTracker: # 1280 * 960
     def init_fingertips(self):
         self.TIP_HEIGHT = 10 # Deal with two recognized points on a fingertip
         self.TIP_MAX_WIDTH = 180 # Max/Min width of a tip (excluding thumb)
-        self.TIP_MIN_WIDTH = 20
+        self.TIP_MIN_WIDTH = 15
         self.THUMB_MAX_WIDTH = 300 # Max/Min width of a thumb
         self.THUMB_MIN_WIDTH = 50
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
@@ -31,7 +31,7 @@ class FingerTracker: # 1280 * 960
         self.fingertips = [[-1, -1]] * 5
     
     def init_touch(self):
-        self.THUMB_DELTA = 50 # The touching thumb is THUMB_DELTA pixels lower than camera_cy
+        self.THUMB_DELTA = 60 # The touching thumb is THUMB_DELTA pixels lower than camera_cy
         self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.is_touch = [False for i in range(5)]
         self.is_touch_down = [False for i in range(5)]
@@ -49,7 +49,7 @@ class FingerTracker: # 1280 * 960
         self.cy = self.camera_mtx[1][2]
         self.intensity_mask = np.zeros((self.N,self.M), dtype=np.float32) # Light up the two sides of the image
         for i in range(0,self.M):
-            tan_theta = (math.tan((120. / 2) * math.pi / 180.)) * (i - self.cx) / (self.M // 2) # FOV = 110 degrees
+            tan_theta = (math.tan((110. / 2) * math.pi / 180.)) * (i - self.cx) / (self.M // 2) # FOV = 110 degrees
             self.intensity_mask[:,i] = (1 + tan_theta ** 2) ** 0.5
 
     def init_endpoints(self):
@@ -112,13 +112,14 @@ class FingerTracker: # 1280 * 960
         r = cv2.max(r1,r2)
         return r
 
-    def find_fingertips(self, image, contours):
+    def find_fingertips(self, contours):
         fingers = self.find_fingers(contours)
         if len(fingers) == 0:
             return np.array([])
 
         fingertips = []
         self.has_thumb = False
+        self.save_finger_contour = {}
         small_chunk = np.min([len(finger) for finger in fingers]) # The thumb can only on the smallest chunk
 
         for finger in fingers:
@@ -170,11 +171,11 @@ class FingerTracker: # 1280 * 960
 
                 if r - l <= max_width and r - l >= min_width and (maybe_thumb or (X[l] != 0 and X[r] != self.M-1)):
                     [x,y] = [X[mid],Y[mid]]
-                    if np.count_nonzero(image[y:,x]) <= 10: # There should be no pixel upper the fingertip
-                        if maybe_thumb:
-                            self.has_thumb = True
-                        maybe_thumb = False
-                        fingertips.append([x,y])
+                    if maybe_thumb:
+                        self.has_thumb = True
+                    maybe_thumb = False
+                    fingertips.append([x,y])
+                    self.save_finger_contour[(x,y)] = [X,Y,mid]
 
         fingertips = np.array(fingertips)
         if fingertips.shape[0] > 5:
@@ -302,25 +303,12 @@ class FingerTracker: # 1280 * 960
             else:
                 self.endpoints[i] = [-1, -1]
 
-    def find_palm_line(self, image, brightness_threshold): # palm_line = the root of the middel finger
+    def find_palm_line(self): # palm_line = the root of the middel finger
         if self.fingertips[2][0] == -1:
             return self.palm_line
-        
-        [x, y] = self.fingertips[2]
-        EDGE_L = max(x - 200, 0)
-        EDGE_R = min(x + 200, self.M - 1)
-        EDGE_D = min(y + 20, self.N - 1)
 
-        sub_image = image[:EDGE_D+1, EDGE_L:EDGE_R+1].copy()
-        sub_image[:2,:] = 255
-        sub_image = self.erode_fingers(sub_image, brightness_threshold)
-        contours = self.find_contours(sub_image, brightness_threshold)
-        contour = max(contours, key=cv2.contourArea)[:,0,:]
-        l = np.argmin(contour[:,0])
-        r = np.argmax(contour[:,0])
-        X = contour[l: r + 1, 0]
-        Y = contour[l: r + 1, 1]
-        mid = np.where(X == (x-EDGE_L))[0][0]
+        [x, y] = self.fingertips[2]
+        [X, Y, mid] = self.save_finger_contour[(x,y)]
 
         N = len(X)
         radius = self.FINGER_RADIUS
@@ -345,7 +333,7 @@ class FingerTracker: # 1280 * 960
             r += 1
         r -= cnt
         
-        xl, xr = X[l]+EDGE_L, X[r]+EDGE_L
+        xl, xr = X[l], X[r]
         yl, yr = Y[l], Y[r]
         x = (xl + xr) // 2
         y = (yl + yr) // 2
@@ -394,6 +382,11 @@ class FingerTracker: # 1280 * 960
         if col != None:
             self.highlight_col = col = max(0.5, min(3.5, col))
 
+    def erode_and_dilate(self, image, iteration, kernel=np.ones((3,3),np.uint8)):
+        image = cv2.erode(image, kernel, iterations=iteration)
+        image = cv2.dilate(image, kernel, iterations=iteration)
+        return image
+
     def run(self, image):
         assert(self.N == image.shape[0] and self.M == image.shape[1])
         self.image = image
@@ -401,10 +394,7 @@ class FingerTracker: # 1280 * 960
         gray = cv2.multiply(gray, self.intensity_mask, dtype=cv2.CV_8U) # Light up the two sides of the image
         brightness_threshold = self.find_brightness_threshold()
         _, gray = cv2.threshold(gray, brightness_threshold, 255, type=cv2.THRESH_TOZERO)
-
-        kernel = np.ones((3,3),np.uint8) # Remove small patches
-        gray = cv2.erode(gray, kernel, iterations=4)
-        gray = cv2.dilate(gray, kernel, iterations=4)
+        gray = self.erode_and_dilate(gray, 4)
 
         contours = self.find_contours(gray, brightness_threshold)
         table_contour = self.find_table(contours)
@@ -414,25 +404,36 @@ class FingerTracker: # 1280 * 960
             if np.min(table_contour[:, :, 1]) <= self.PALM_THRESHOLD: # Table connect with fingers
                 touch_line, table_contour = self.find_touch_line(gray, brightness_threshold) # Also remove the table
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED)
-                contours = self.find_contours(gray, brightness_threshold)
             else:
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED) # There is a table, but not connect with fingers
-                contours.remove(table_contour)
         
-        fingertips = self.find_fingertips(gray, contours)
+        kernel = np.array([[4, 2, 1, -4, -6, -4, 1, 2, 4]]) # Remove the crevices between fingers
+        eroded_gray = gray[:int(self.cy)+150,:]
+        crevice = cv2.filter2D(eroded_gray, -1, kernel)
+        crevice = self.erode_and_dilate(crevice, 3, kernel=np.array([[1],[1],[1]]))
+        eroded_gray = cv2.subtract(eroded_gray, crevice)
+        contours = self.find_contours(eroded_gray, brightness_threshold)
+
+        fingertips = self.find_fingertips(contours)
         self.assign_fingertips(fingertips)
         self.calc_touch(touch_line)
         self.calc_endpoints()
-        self.palm_line = self.find_palm_line(gray, brightness_threshold)
+        self.palm_line = self.find_palm_line()
         self.calc_highlight()
 
         # Save intermediate result
         self.illustration = gray
         self.touch_line = touch_line
+        self.contours = contours
 
     def output(self, title=''):
         result = self.illustration
-        
+
+        #cv2.drawContours(result, self.contours, -1, 255)
+        #if len(self.touch_line) > 0: # Draw touch line
+        #    for i in range(self.M):
+        #        cv2.circle(result, tuple([i,int(self.touch_line[i])]), 2, (255,0,0), cv2.FILLED)
+
         for i in range(len(self.fingertips)):
             fingertip = self.fingertips[i]
             if fingertip[0] == -1:
@@ -445,10 +446,6 @@ class FingerTracker: # 1280 * 960
 
             cv2.circle(result, tuple(fingertip), size, 255, cv2.FILLED)
             cv2.putText(result, self.finger_names[i][0], tuple([fingertip[0]+15, fingertip[1]]), 0, 1.2, 255, 3)
-
-        #if len(self.touch_line) > 0: # Draw touch line
-        #    for i in range(self.M):
-        #        cv2.circle(result, tuple([i,int(self.touch_line[i])]), 2, (255,0,0), cv2.FILLED)
 
         cv2.putText(result, title, tuple([0, 100]), 0, 1.2, (0,0,255), 3)
         result = cv2.resize(result, (320, 240))
