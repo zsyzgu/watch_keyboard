@@ -83,7 +83,7 @@ class Keyboard:
                 line = lines[i]
                 tags = line.strip().split(' ')
                 word = tags[0]
-                pri = int(tags[1])
+                pri = float(tags[1])
                 self.corpus.append((word, pri))
 
     def init_inputted_data(self):
@@ -235,7 +235,10 @@ class Keyboard:
                     dx = x - xc
                     dy = y - yc
                     z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                    pri *= ((2 * math.pi * std_xy * ((1 - p ** 2) ** 0.5)) ** -1) * math.exp(-z / (2 * (1 - p ** 2)))
+                    prob = (.01 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
+                    pri *= prob
+                    if pri < max_pri:
+                        break
                 if pri > max_pri:
                     max_pri = pri
                     best_candidate = candidate

@@ -86,7 +86,7 @@ class FingerTracker: # 1280 * 960
             if cv2.contourArea(contour) >= self.CONTOURS_MIN_AREA: # The finger must have enough area
                 points = contour[:,0]
                 fingers.append(np.array(points))
-
+        fingers.sort(key=cv2.contourArea)
         return fingers
 
     def find_brightness_threshold(self):
@@ -148,10 +148,10 @@ class FingerTracker: # 1280 * 960
                 ids.remove(-1)
 
             if self.camera_id == 1: # Left hand
-                maybe_thumb = (np.max(finger[:,0]) == self.M-1)
+                maybe_thumb = (not self.has_thumb) and (np.max(finger[:,0]) == self.M-1)
                 ids.reverse()
             else: # Right hand
-                maybe_thumb = (np.min(finger[:,0]) == 0)
+                maybe_thumb = (not self.has_thumb) and (np.min(finger[:,0]) == 0)
 
             for i in range(len(ids)): # Judge finger height and width
                 id = ids[i]

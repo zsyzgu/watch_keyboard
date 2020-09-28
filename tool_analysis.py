@@ -7,6 +7,9 @@ from astroML.stats import fit_bivariate_normal
 from astroML.stats.random import bivariate_normal
 import math
 import os
+import time
+import cv2
+from finger_tracker import FingerTracker
 
 class Simulation:
     LETTER_DISTRIBUTION_LAYOUT = 0
@@ -22,7 +25,7 @@ class Simulation:
         for i in range(20000):
             tags = lines[i].split(' ')
             word = tags[0]
-            pri = int(tags[1])
+            pri = float(tags[1])
             self.corpus.append([word, pri])
     
     def calc_letter_distribution(self, mode = LETTER_DISTRIBUTION_LAYOUT, **kwargs):
@@ -128,8 +131,11 @@ class Simulation:
                     dx = x - xc
                     dy = y - yc
                     z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                    prob = ((2 * math.pi * std_xy * ((1 - p ** 2) ** 0.5)) ** -1) * math.exp(-z / (2 * (1 - p ** 2)))
+                    prob = (.01 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
                     pri *= prob
+                    assert(prob < 1)
+                    if pri < max_pri:
+                        break
                 if pri > max_pri:
                     max_pri = pri
                     best_candidate = candidate
@@ -179,9 +185,13 @@ class Simulation:
     def run(self):
         task_list, inputted_list, data_list = self.input()
         self.calc_letter_distribution(mode=self.LETTER_DISTRIBUTION_STAT, data_list=data_list, task_list=task_list)
+        
+        tracker_L = FingerTracker(1)
+        tracker_R = FingerTracker(2)
 
         ranks = []
         fail_cases = []
+        ts = []
         for task, inputted, data in zip(task_list, inputted_list, data_list):
             words = task.split()
             begin = 0
@@ -192,13 +202,39 @@ class Simulation:
                 word_data = data[begin:end]
                 points = [self.get_position(w) for w in word_data]
                 if enter == word:
+                    t=time.clock()
                     pred, rank = self.predict(points, word)
+                    t=time.clock()-t
+                    ts.append(t)
                     ranks.append(rank)
                     if pred != word:
                         print('[Fail Cases]', word, pred)
                         fail_cases.append([word, word_data])
 
+                        '''
+                        for index in range(len(word_data)):
+                            d = word_data[index]
+                            [side, which_finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = d
+                            print(word, word[index], frame_id)
+                            frame_L = cv2.imread('data/' + sys.argv[1] + '/L/' + str(frame_id) + '.jpg')
+                            frame_R = cv2.imread('data/' + sys.argv[1] + '/R/' + str(frame_id) + '.jpg')
+                            tracker_L.run(frame_L)
+                            tracker_R.run(frame_R)
+                            output_L = tracker_L.output()
+                            output_R = tracker_R.output()
+                            output = np.hstack([output_L, output_R])
+                            if side == 'L':
+                                record = tracker_L.palm_line
+                            else:
+                                record = tracker_R.palm_line
+                            if abs(record - palm_line) > 10:
+                                print('[Palm Line Chaged]', record, palm_line)
+                            cv2.imshow('illustration', output)
+                            cv2.waitKey(0)
+                        '''
+
                 begin = end + 1
+        print(np.mean(ts))
 
         print('=====   Top-5 accuracy   =====')
         ranks = np.array(ranks)

@@ -50,6 +50,7 @@ def erode_fingers(frame):
     r = cv2.max(r1,r2)
     return r
 
+'''
 def test():
     tracker = FingerTracker(2)
     files = os.listdir('raw/')
@@ -66,6 +67,45 @@ def test():
         cv2.imshow('e',output)
         cv2.waitKey(1)
     print(np.mean(ts))
+'''
+
+def test():
+    tracker_L = FingerTracker(1)
+    tracker_R = FingerTracker(2)
+
+    '''
+    files = open('debug.txt').readlines()
+    for file_name in files:
+        file_name = file_name.strip()
+        print(file_name)
+        
+        frame_L = cv2.imread(file_name)
+        tracker_L.run(frame_L)
+        output_L = tracker_L.output()
+        cv2.imshow('illustration', output_L)
+        cv2.waitKey(0)
+    '''
+
+    folder_name = 'data/2-1/'
+    for i in range(1000):
+        file_L = folder_name + 'L/' + str(i) + '.jpg'
+        file_R = folder_name + 'R/' + str(i) + '.jpg'
+        if os.path.exists(file_L) == False:
+            break
+        frame_L = cv2.imread(file_L)
+        frame_R = cv2.imread(file_R)
+        tracker_L.run(frame_L)
+        tracker_R.run(frame_R)
+        output_L = tracker_L.output()
+        output_R = tracker_R.output()
+        output = np.hstack([output_L, output_R])
+        cv2.imshow('illustration', output)
+        if np.any(np.array(tracker_R.fingertips)[:,0] == -1):
+            print(file_R)
+            cv2.waitKey(0)
+        else:
+            cv2.waitKey(1)
+
 
 
 if __name__ == "__main__":

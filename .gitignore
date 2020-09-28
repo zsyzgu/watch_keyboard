@@ -5,4 +5,5 @@ __pycache__/
 /raw
 /test
 /data
+/original_data
 debug.pickle
