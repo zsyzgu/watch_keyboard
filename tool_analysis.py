@@ -12,12 +12,8 @@ import cv2
 from finger_tracker import FingerTracker
 
 class Simulation:
-    LETTER_DISTRIBUTION_LAYOUT = 0
-    LETTER_DISTRIBUTION_STAT = 1
-
     def __init__(self):
         self.init_corpus()
-        self.calc_letter_distribution()
     
     def init_corpus(self):
         self.corpus = []
@@ -28,44 +24,43 @@ class Simulation:
             pri = float(tags[1])
             self.corpus.append([word, pri])
     
-    def calc_letter_distribution(self, mode = LETTER_DISTRIBUTION_LAYOUT, **kwargs):
-        if mode == self.LETTER_DISTRIBUTION_LAYOUT: # set letter distribution according to keyboard layout
-            QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
-            self.letter_positions = [[-1, -1] for i in range(26)]
-            self.letter_distributions = [[-1, -1, 0.1, 0.1, 0.1, 0] for i in range(26)] # Formal = [xc, yc, std_x2, std_y2, std_xy, p]
-            for r in range(3):
-                line = QWERTY[r]
-                for c in range(len(line)):
-                    ch = line[c]
-                    index = ord(ch) - ord('A')
-                    self.letter_positions[index] = [c, r]
-                    self.letter_distributions[index][:2] = [c, r]
-        if mode == self.LETTER_DISTRIBUTION_STAT: # set letter distribution according to statistic analysis
-            data_list = kwargs['data_list']
-            task_list = kwargs['task_list']
+    def calc_letter_distribution(self, **kwargs):
+        data_list = kwargs['data_list']
+        task_list = kwargs['task_list']
+        assert(len(data_list) == len(task_list))
 
-            assert(len(data_list) == len(task_list))
+        QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
+        self.letter_positions = [[-1, -1] for i in range(26)]
+        self.letter_fingers = np.zeros((26, 10))
+        self.letter_distributions = [[[-1, -1, 0.1, 0.1, 0.1, 0] for finger in range(10)] for alpha in range(26)] # Formal = [xc, yc, std_x2, std_y2, std_xy, p]
+        for r in range(3):
+            line = QWERTY[r]
+            for c in range(len(line)):
+                ch = line[c]
+                alpha = ord(ch) - ord('A')
+                self.letter_positions[alpha] = [c, r]
 
-            features = [[] for ch in range(26)]
-            for data, task in zip(data_list, task_list):
-                assert(len(data) == len(task))
-                for i in range(len(task)):
-                    letter = task[i]
-                    if letter.isalpha():
-                        index = ord(letter) - ord('a')
-                        feature = self.get_feature(data[i])
-                        features[index].append(feature)
-            
-            fig, ax = plt.subplots()
-            ans = []
-            for index in range(26):
-                if len(features[index]) >= 2:
-                    X = np.array(features[index])[:,0]
-                    Y = np.array(features[index])[:,1]
-                    n_std = 3
-
-                    if len(features[index]) >= 5:
-                        # exclude >3_std
+        features = [[[] for finger in range(10)] for alpha in range(26)]
+        for data, task in zip(data_list, task_list):
+            assert(len(data) == len(task))
+            for i in range(len(task)):
+                letter = task[i]
+                if letter.isalpha():
+                    alpha = ord(letter) - ord('a')
+                    feature = self.get_feature(data[i])
+                    finger = self.get_finger(data[i])
+                    features[alpha][finger].append(feature)
+        
+        for alpha in range(26):
+            for finger in range(10):
+                points = np.array(features[alpha][finger])
+                if len(points) >= 1:
+                    self.letter_fingers[alpha][finger] += len(points)
+                    X = points[:, 0]
+                    Y = points[:, 1]
+                
+                    if len(points) >= 5: # Remove > 3_std
+                        n_std = 3
                         xc, x_std = np.mean(X), np.std(X)
                         yc, y_std = np.mean(Y), np.std(Y)
                         pack = zip(X.copy(), Y.copy())
@@ -75,41 +70,51 @@ class Simulation:
                             if abs(x-xc) <= n_std * x_std and abs(y-yc) <= n_std * y_std:
                                 X.append(x)
                                 Y.append(y)
-
-                        (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=False)
-                        xc, yc = center
-                        ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
-
-                        plt.scatter(X, Y, color=('C'+str(index)), s = 5)
-                        plt.scatter(xc, yc, color='red', s = 10)
-                        ax.add_patch(ell)
-
-                    cov = np.cov(np.array([X,Y]))
-                    cov[0,0] = max(cov[0, 0], .01)
-                    cov[1,1] = max(cov[1, 1], .01)
+                    
+                    xc = np.mean(X)
+                    yc = np.mean(Y)
+                    
+                    cov = np.array([[0.01, 0], [0, 0.01]])
+                    if len(points) >= 5:
+                        cov = np.cov(np.array([X,Y]))
+                    
                     std_x2 = cov[0, 0]
                     std_y2 = cov[1, 1]
                     std_xy = (std_x2 ** 0.5) * (std_y2 ** 0.5)
                     p = cov[0, 1] / std_xy
-                    self.letter_distributions[index] = [xc, yc, std_x2, std_y2, std_xy, p]
-                else:
-                    print('Lack =', chr(index + ord('a')))
-            #plt.show()
+                    assert(not(np.isnan(std_x2) or np.isnan(std_y2) or np.isnan(std_xy)))
+                    self.letter_distributions[alpha][finger] = [xc, yc, std_x2, std_y2, std_xy, p]
+            
+            if sum(self.letter_fingers[alpha]) != 0:
+                self.letter_fingers[alpha] /= sum(self.letter_fingers[alpha])
+                std_fingering = np.argmax(self.letter_fingers[alpha])
+                for finger in range(10):
+                    if self.letter_fingers[alpha][finger] == 0:
+                        self.letter_distributions[alpha][finger] = self.letter_distributions[alpha][std_fingering].copy()
+                    self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.01)
     
+    def get_finger(self, data):
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
+        assert(side == 'L' or side == 'R')
+        if side == 'L':
+            return finger
+        if side == 'R':
+            return finger + 5
+
     def get_feature(self, data): # get position from inputted data
-        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
         row = max(0-0.5,min(2+0.5,highlight_row - 1)) # Display setting
         col = max(0-0.5,min(1+0.5,highlight_col - 1))
         if side == 'L':
-            if index == 1:
+            if finger == 1:
                 col = 3 + col
             else:
-                col = 3 - (index - 1)
+                col = 3 - (finger - 1)
         if side == 'R':
-            if index == 1:
+            if finger == 1:
                 col = 6 - col
             else:
-                col = 6 + (index - 1)
+                col = 6 + (finger - 1)
             
             col += 1
             endpoint_x += 10
@@ -117,36 +122,39 @@ class Simulation:
         return [endpoint_x, endpoint_y]
 
     def get_position(self, data):
-        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
         row = int(round(max(0,min(2,highlight_row - 1))))
         col = int(round(max(0,min(1,highlight_col - 1))))
         if side == 'L':
-            if index == 1:
+            if finger == 1:
                 col = 3 + col
             else:
-                col = 3 - (index - 1)
+                col = 3 - (finger - 1)
         if side == 'R':
-            if index == 1:
+            if finger == 1:
                 col = 6 - col
             else:
-                col = 6 + (index - 1)
+                col = 6 + (finger - 1)
         return [col, row]
 
     def predict(self, data, truth):
         features = [self.get_feature(tap) for tap in data]
+        fingers = [self.get_finger(tap) for tap in data]
         positions = [self.get_position(tap) for tap in data]
 
         P = np.zeros((len(features), 26)) # P(alpha | w_i)
         for i in range(len(features)):
-            for index in range(26):
+            for alpha in range(26):
+                finger = fingers[i]
                 [x, y] = features[i]
-                [xc, yc, std_x2, std_y2, std_xy, p] = self.letter_distributions[index]
+                [xc, yc, std_x2, std_y2, std_xy, p] = self.letter_distributions[alpha][finger]
                 dx = x - xc
                 dy = y - yc
                 z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                step_prob = (.001 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
+                step_prob = self.letter_fingers[alpha][finger]
+                step_prob *= (.001 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
                 assert(step_prob < 1)
-                P[i, index] = step_prob
+                P[i, alpha] = step_prob
 
         max_prob = 0
         best_candidate = ''
@@ -155,15 +163,15 @@ class Simulation:
             if len(candidate) == len(features):
                 for i in range(len(features)):
                     letter = candidate[i]
-                    index = ord(letter) - ord('a')
+                    alpha = ord(letter) - ord('a')
 
-                    [xc, yc] = self.letter_positions[index]
+                    [xc, yc] = self.letter_positions[alpha]
                     [x, y] = positions[i]
                     if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
                         prob = 0
                         break
 
-                    step_prob = P[i, index]
+                    step_prob = P[i, alpha]
                     prob *= step_prob
                     if prob < max_prob:
                         break
@@ -213,7 +221,7 @@ class Simulation:
 
     def run(self):
         task_list, inputted_list, data_list = self.input()
-        self.calc_letter_distribution(mode=self.LETTER_DISTRIBUTION_STAT, data_list=data_list, task_list=task_list)
+        self.calc_letter_distribution(data_list=data_list, task_list=task_list)
 
         ranks = []
         fail_cases = []
@@ -228,8 +236,8 @@ class Simulation:
                 if enter == word:
                     pred, rank = self.predict(word_data, word)
                     ranks.append(rank)
-                    if pred != word:
-                        # print('[Fail Cases]', word, pred)
+                    if pred != word and rank != -1:
+                        #print('[Fail Cases]', word, pred, rank)
                         fail_cases.append([word, word_data])
 
                 begin = end + 1
