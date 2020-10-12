@@ -5,6 +5,7 @@ import random
 import pygame
 import math
 from PIL import Image, ImageFont, ImageDraw
+from decoder import Decoder
 
 class Keyboard:
     GRID = 50
@@ -28,23 +29,13 @@ class Keyboard:
         self.init_display()
     
     def init_letter_info(self):
-        QWERTY = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
+        self.decoder = Decoder()
+        
         FINGER_PINKIE = 'QAZ|P'
         FINGER_RING = 'WSX|OL'
         FINGER_MIDDLE = 'EDC|IK'
         FINGER_INDEX_L = 'RFV|TGB'
         FINGER_INDEX_R = 'YHN|UJM'
-
-        self.letter_positions = [[-1, -1] for i in range(26)]
-        self.letter_distributions = [[-1, -1, 0.1, 0.1, 0.1, 0] for i in range(26)] # Formal = [xc, yc, std_x2, std_y2, std_xy, p]
-        for r in range(3):
-            line = QWERTY[r]
-            for c in range(len(line)):
-                ch = line[c]
-                index = ord(ch) - ord('A')
-                self.letter_positions[index] = [c, r]
-                self.letter_distributions[index][:2] = [c, r]
-        
         self.letter_colors = [(0,0,0) for i in range(26)]
         for index in range(26):
             ch = chr(index + ord('A'))
@@ -112,7 +103,7 @@ class Keyboard:
         # Draw the keyboard layout
         for i in range(26):
             ch = chr(i + ord('A'))
-            pos = self.letter_distributions[i][:2]
+            pos = self.decoder.positions[i]
             bg_color = self.letter_colors[i]
             cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), bg_color, -1)
             cv2.rectangle(image, (int(pos[0] * GRID), int((pos[1] + 1) * GRID)), (int((pos[0] + 1) * GRID), int((pos[1] + 2) * GRID)), (255, 255, 255), 1)
@@ -186,7 +177,7 @@ class Keyboard:
         if self.WORD_CORRECTION == self.CORRECT_WORD:
             tags = self.inputted_text.split(' ')
             if len(tags) > 0 and tags[-1] != '':
-                word = self.word_correction(self.inputted_data[-len(tags[-1]):])
+                word = self.decoder.predict(self.inputted_data[-len(tags[-1]):])
                 if word != '': # '' means no match
                     tags[-1] = word
                 self.inputted_text = ' '.join(tags)
@@ -214,34 +205,4 @@ class Keyboard:
             else:
                 col = 6 + (index - 1)
         return [col, row]
-
-    def word_correction(self, inputted_data):
-        positions = []
-        for data in inputted_data:
-            pos = self.get_position(data)
-            positions.append(pos)
         
-        N = len(self.corpus)
-        max_pri = 0
-        best_candidate = ''
-        for i in range(N):
-            (candidate, pri) = self.corpus[i]
-            if len(candidate) == len(positions):
-                for j in range(len(positions)):
-                    letter = candidate[j]
-                    index = ord(letter) - ord('a')
-                    [x, y] = positions[j]
-                    [xc, yc, std_x2, std_y2, std_xy, p] = self.letter_distributions[index]
-                    dx = x - xc
-                    dy = y - yc
-                    z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                    prob = (.01 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
-                    pri *= prob
-                    if pri < max_pri:
-                        break
-                if pri > max_pri:
-                    max_pri = pri
-                    best_candidate = candidate
-        
-        return best_candidate
-            

@@ -10,6 +10,7 @@ import os
 import time
 import cv2
 from finger_tracker import FingerTracker
+from decoder import Decoder
 
 class Simulation:
     def __init__(self):
@@ -47,8 +48,8 @@ class Simulation:
                 letter = task[i]
                 if letter.isalpha():
                     alpha = ord(letter) - ord('a')
-                    feature = self.get_feature(data[i])
-                    finger = self.get_finger(data[i])
+                    feature = Decoder.get_feature(data[i])
+                    finger = Decoder.get_finger(data[i])
                     features[alpha][finger].append(feature)
         
         for alpha in range(26):
@@ -92,102 +93,10 @@ class Simulation:
                     if self.letter_fingers[alpha][finger] == 0:
                         self.letter_distributions[alpha][finger] = self.letter_distributions[alpha][std_fingering].copy()
                     self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.01)
-    
-    def get_finger(self, data):
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
-        assert(side == 'L' or side == 'R')
-        if side == 'L':
-            return finger
-        if side == 'R':
-            return finger + 5
-
-    def get_feature(self, data): # get position from inputted data
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
-        row = max(0-0.5,min(2+0.5,highlight_row - 1)) # Display setting
-        col = max(0-0.5,min(1+0.5,highlight_col - 1))
-        if side == 'L':
-            if finger == 1:
-                col = 3 + col
-            else:
-                col = 3 - (finger - 1)
-        if side == 'R':
-            if finger == 1:
-                col = 6 - col
-            else:
-                col = 6 + (finger - 1)
-            
-            col += 1
-            endpoint_x += 10
-        #return [col, row]
-        return [endpoint_x, endpoint_y]
-
-    def get_position(self, data):
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
-        row = int(round(max(0,min(2,highlight_row - 1))))
-        col = int(round(max(0,min(1,highlight_col - 1))))
-        if side == 'L':
-            if finger == 1:
-                col = 3 + col
-            else:
-                col = 3 - (finger - 1)
-        if side == 'R':
-            if finger == 1:
-                col = 6 - col
-            else:
-                col = 6 + (finger - 1)
-        return [col, row]
-
-    def predict(self, data, truth):
-        features = [self.get_feature(tap) for tap in data]
-        fingers = [self.get_finger(tap) for tap in data]
-        positions = [self.get_position(tap) for tap in data]
-
-        P = np.zeros((len(features), 26)) # P(alpha | w_i)
-        for i in range(len(features)):
-            for alpha in range(26):
-                finger = fingers[i]
-                [x, y] = features[i]
-                [xc, yc, std_x2, std_y2, std_xy, p] = self.letter_distributions[alpha][finger]
-                dx = x - xc
-                dy = y - yc
-                z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
-                step_prob = self.letter_fingers[alpha][finger]
-                step_prob *= (.001 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
-                assert(step_prob < 1)
-                P[i, alpha] = step_prob
-
-        max_prob = 0
-        best_candidate = ''
-        probs = []
-        for (candidate, prob) in self.corpus:
-            if len(candidate) == len(features):
-                for i in range(len(features)):
-                    letter = candidate[i]
-                    alpha = ord(letter) - ord('a')
-
-                    [xc, yc] = self.letter_positions[alpha]
-                    [x, y] = positions[i]
-                    if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
-                        prob = 0
-                        break
-
-                    step_prob = P[i, alpha]
-                    prob *= step_prob
-                    if prob < max_prob:
-                        break
-
-                if prob > max_prob:
-                    max_prob = prob
-                    best_candidate = candidate
-                probs.append(prob)
-                if candidate == truth:
-                    truth_prob = prob
         
-        rank = 1 + sum(np.array(probs) > truth_prob)
-        if truth_prob == 0:
-            rank = -1
-        return best_candidate, rank
-
+        pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('touch_model.pickle', 'wb'))
+        self.decoder = Decoder()
+    
     def input(self):
         nums = sys.argv[1].split('-')
         assert(len(nums) == 2)
@@ -234,7 +143,7 @@ class Simulation:
                 enter = inputted[begin:end]
                 word_data = data[begin:end]
                 if enter == word:
-                    pred, rank = self.predict(word_data, word)
+                    pred, rank = self.decoder.predict(word_data, word)
                     ranks.append(rank)
                     if pred != word and rank != -1:
                         #print('[Fail Cases]', word, pred, rank)

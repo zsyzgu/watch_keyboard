@@ -57,7 +57,7 @@ def calc_letter(keyboard, input_data):
             col = 6 + (index - 1)
     
     for i in range(26):
-        [c, r] = keyboard.letter_positions[i]
+        [c, r] = keyboard.decoder.positions[i]
         if row == r and col == c:
             return chr(ord('a') + i)
     

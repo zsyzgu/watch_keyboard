@@ -2,6 +2,7 @@ __pycache__/
 *.mp4
 *.calib
 *.regist
+*.pickle
 /raw
 /test
 /data
