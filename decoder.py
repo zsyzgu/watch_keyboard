@@ -11,21 +11,31 @@ import time
 import cv2
 
 class Decoder:
-    def __init__(self):
+    def __init__(self, is_tgrams = True):
+        self.is_tgrams = is_tgrams
         self.init_touch_model()
         self.init_language_model()
     
     def init_touch_model(self):
-        [self.positions, self.fingers, self.distributions] = pickle.load(open('touch_model.pickle', 'rb'))
+        [self.positions, self.fingers, self.distributions] = pickle.load(open('touch.model', 'rb'))
 
     def init_language_model(self):
+        self.size = 20000
         self.corpus = []
+        self.corpus_map = {}
+        self.corpus_prob = []
         lines = open('corpus.txt').readlines()
-        for i in range(20000):
+        for i in range(self.size):
             tags = lines[i].split(' ')
             word = tags[0]
-            pri = float(tags[1])
-            self.corpus.append([word, pri])
+            prob = float(tags[1])
+            self.corpus.append(word)
+            self.corpus_prob.append(prob)
+            self.corpus_map[word] = i
+
+        if self.is_tgrams:
+            [self.bgrams_index, self.bgrams_freq] = pickle.load(open('2grams.model', 'rb'))
+            [self.tgrams_index, self.tgrams_freq] = pickle.load(open('3grams.model', 'rb'))
 
     def get_finger(data):
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
@@ -39,7 +49,8 @@ class Decoder:
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
         if side == 'R':
             endpoint_x += 10
-        return [endpoint_x, endpoint_y]
+        return [endpoint_x, highlight_row]
+        #return [endpoint_x, endpoint_y]
 
     def get_position(data):
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
@@ -57,7 +68,48 @@ class Decoder:
                 col = 6 + (finger - 1)
         return [col, row]
 
-    def predict(self, data, truth = None):
+    def binary_search(self, arr, key):
+        st = 0
+        en = len(arr) - 1
+        while (st < en):
+            mid = (st + en + 1) // 2 # TODO: check
+            if key >= arr[mid]:
+                st = mid
+            else:
+                en = mid - 1
+        if arr[st] == key:
+            return st
+        else:
+            return -1
+
+    def get_corpus_prob(self, inputted):
+        if self.is_tgrams:
+            words = inputted.split()
+            index = -1
+            if len(words) >= 3 and words[-3] in self.corpus_map and words[-2] in self.corpus_map: # Trigram
+                key = self.corpus_map[words[-3]] * self.size + self.corpus_map[words[-2]]
+                index = self.binary_search(self.tgrams_index[:,0], key)
+                ngrams_index = self.tgrams_index
+                ngrams_freq = self.tgrams_freq
+            if index == -1 and len(words) >= 2 and words[-2] in self.corpus_map: # Bigram
+                key = self.corpus_map[words[-2]]
+                index = self.binary_search(self.bgrams_index[:,0], key)
+                ngrams_index = self.bgrams_index
+                ngrams_freq = self.bgrams_freq
+            if index != -1:
+                st = ngrams_index[index, 1]
+                if index + 1 < ngrams_index.shape[0]:
+                    en = ngrams_index[index + 1, 1]
+                else:
+                    en = ngrams_freq.shape[0]
+                corpus_prob = np.zeros(self.size)
+                for i in range(st, en):
+                    corpus_prob[ngrams_freq[i, 0]] = ngrams_freq[i, 1]
+                corpus_prob[corpus_prob == 0] = 1
+                return corpus_prob
+        return self.corpus_prob # Unigram
+
+    def predict(self, data, inputted, truth = None):
         features = [Decoder.get_feature(tap) for tap in data]
         fingers = [Decoder.get_finger(tap) for tap in data]
         positions = [Decoder.get_position(tap) for tap in data]
@@ -76,11 +128,14 @@ class Decoder:
                 assert(step_prob < 1)
                 P[i, alpha] = step_prob
 
+        corpus_prob = self.get_corpus_prob(inputted)
         max_prob = 0
         best_candidate = ''
         probs = []
         truth_prob = 0
-        for (candidate, prob) in self.corpus:
+        for i in range(len(self.corpus)):
+            candidate = self.corpus[i]
+            prob = corpus_prob[i]
             if len(candidate) == len(features):
                 for i in range(len(features)):
                     letter = candidate[i]

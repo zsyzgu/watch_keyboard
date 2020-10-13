@@ -94,7 +94,7 @@ class Simulation:
                         self.letter_distributions[alpha][finger] = self.letter_distributions[alpha][std_fingering].copy()
                     self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.01)
         
-        pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('touch_model.pickle', 'wb'))
+        pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('touch.model', 'wb'))
         self.decoder = Decoder()
     
     def input(self):
@@ -103,7 +103,7 @@ class Simulation:
         if nums[0].isdigit():
             users = [int(nums[0])]
         else:
-            users = range(1, 13)
+            users = [1,2,3,4,5,6,8,9,10,12]#range(1, 13)
         if nums[1].isdigit():
             sessions = [int(nums[1])]
         else:
@@ -143,7 +143,7 @@ class Simulation:
                 enter = inputted[begin:end]
                 word_data = data[begin:end]
                 if enter == word:
-                    pred, rank = self.decoder.predict(word_data, word)
+                    pred, rank = self.decoder.predict(word_data, task[:end], word)
                     ranks.append(rank)
                     if pred != word and rank != -1:
                         #print('[Fail Cases]', word, pred, rank)
@@ -181,6 +181,12 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print('[Usage] python tool_analysis.py folder_name(x-x)')
         exit()
+
+    # General model
+    Simulation().run()
+    exit()
+
+    # Personalized
     if sys.argv[1] != 'x-x':
         Simulation().run()
     else:

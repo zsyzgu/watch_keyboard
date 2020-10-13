@@ -3,6 +3,7 @@ __pycache__/
 *.calib
 *.regist
 *.pickle
+*.model
 /raw
 /test
 /data

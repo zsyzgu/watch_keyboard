@@ -268,17 +268,19 @@ class FingerTracker: # 1280 * 960
         self.is_touch_down = [False for i in range(5)]
         self.is_touch_up = [False for i in range(5)]
         
-        if self.fingertips[0][0] != -1: # The thumb
-            x, y = self.fingertips[0][0], self.fingertips[0][1]
-            self.is_touch[0] = (y >= self.cy + self.THUMB_DELTA)
+        #if self.fingertips[0][0] != -1: # The thumb
+        #    x, y = self.fingertips[0][0], self.fingertips[0][1]
+        #    self.is_touch[0] = (y >= self.cy + self.THUMB_DELTA)
         if len(touch_line) > 0:
-            for i in range(1, 5): # Not the thumb
+            for i in range(0, 5): # Not the thumb
                 if self.fingertips[i][0] != -1:
                     [x, y] = self.fingertips[i]
                     if y+3 >= touch_line[x]:
                         y=int(touch_line[x])
                         gray_line = cv2.cvtColor(image[y-10:y+10,x:x+1], cv2.COLOR_RGB2GRAY)
                         endpoint_brightness = float(np.min(gray_line)) / np.max(gray_line)
+                        if i == 0: # The thumb is not that bright
+                            endpoint_brightness += 0.15
                         if endpoint_brightness >= self.MIN_ENDPOINT_BRIGHTNESS:
                             self.is_touch[i] = True
         

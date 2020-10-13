@@ -174,10 +174,12 @@ class Keyboard:
 
     def enter_a_space(self, input_data):
         i = len(self.inputted_text)
+        if i == 0 or self.inputted_text[-1] == ' ':
+            return
         if self.WORD_CORRECTION == self.CORRECT_WORD:
             tags = self.inputted_text.split(' ')
             if len(tags) > 0 and tags[-1] != '':
-                word = self.decoder.predict(self.inputted_data[-len(tags[-1]):])
+                word = self.decoder.predict(self.inputted_data[-len(tags[-1]):], self.task[:len(self.inputted_text)])
                 if word != '': # '' means no match
                     tags[-1] = word
                 self.inputted_text = ' '.join(tags)
