@@ -74,8 +74,11 @@ class Simulation:
                     
                     xc = np.mean(X)
                     yc = np.mean(Y)
+
+                    #plt.scatter(X, Y, color=('C'+str(alpha)), s = 5)
+                    #plt.scatter(xc, yc, color='red', s = 10)
                     
-                    cov = np.array([[0.01, 0], [0, 0.01]])
+                    cov = np.array([[0.1, 0], [0, 0.1]])
                     if len(points) >= 5:
                         cov = np.cov(np.array([X,Y]))
                     
@@ -92,8 +95,9 @@ class Simulation:
                 for finger in range(10):
                     if self.letter_fingers[alpha][finger] == 0:
                         self.letter_distributions[alpha][finger] = self.letter_distributions[alpha][std_fingering].copy()
-                    self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.01)
+                    self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.001)
         
+        #plt.show()
         pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('touch.model', 'wb'))
         self.decoder = Decoder()
     
@@ -116,7 +120,7 @@ class Simulation:
 
         for user in users:
             for session in sessions:
-                folder_path = 'data/' + str(user) + '-' + str(session) + '/'
+                folder_path = 'data-study1/' + str(user) + '-' + str(session) + '/'
                 for i in range(N):
                     file_path = folder_path + str(i) + '.pickle'
                     if os.path.exists(file_path):
@@ -163,19 +167,6 @@ class Simulation:
         
         pickle.dump([self, fail_cases], open('debug.pickle', 'wb'))
         return TOP_1
-
-class Debug:
-    def __init__(self):
-        pass
-
-    def run(self):
-        [sim, fail_cases] = pickle.load(open('debug.pickle', 'rb'))
-
-        for [word, data] in fail_cases:
-            plt.scatter(features[:,0], features[:,1])
-            plt.show()
-            pred, rank = sim.predict(data, word)
-            print(word, pred)
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

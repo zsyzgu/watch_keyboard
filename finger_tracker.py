@@ -54,6 +54,7 @@ class FingerTracker: # 1280 * 960
 
     def init_endpoints(self):
         self.endpoints = [[-1,-1]] * 5 # endpoint on the desk calned by touchpoint
+        self.corr_endpoints = [[-1, -1]] * 5 # endpoint corrected by registered range
         self.palm_line = 0 # The root of the middle finger (in y axis)
         self.palm_line_dx = 0 # (dx,dy) = the vector between the groove of 2nd/3rd fingers and the groove of 3rd/4th fingers
         self.palm_line_dy = 0
@@ -61,7 +62,7 @@ class FingerTracker: # 1280 * 960
     def init_highlight(self, camera_id):
         pc = pickle.load(open(str(camera_id) + '.regist', 'rb'))
         self.row_position = [np.mean(pc[r,:,1]) for r in range(3)]
-        self.col_position = [np.mean(pc[:,c,0]) for c in range(2)]
+        self.col_position = [np.mean(pc[:,c,0]) for c in range(5)]
         self.highlight_col = None
         self.highlight_row = None
 
@@ -302,6 +303,13 @@ class FingerTracker: # 1280 * 960
                 z = (self.camera_H * self.fy) / (Y - self.cy)
                 x = (X - self.cx) / self.fx * z
                 self.endpoints[i] = [x, z]
+                corr_x = (x - self.col_position[1]) / (self.col_position[4] - self.col_position[1]) * 3
+                corr_y = (z - self.row_position[0]) / (self.row_position[2] - self.row_position[0]) * 2
+                if self.camera_id == 1: # Left hand
+                    corr_x = 0 - corr_x
+                else:
+                    corr_x = 3 + corr_x
+                self.corr_endpoints[i] = [corr_x, corr_y]
             else:
                 self.endpoints[i] = [-1, -1]
 

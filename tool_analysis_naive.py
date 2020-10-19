@@ -18,15 +18,22 @@ class Simulation:
     def __init__(self):
         self.init_corpus()
         self.calc_letter_distribution()
+        [self.bgrams_index, self.bgrams_freq] = pickle.load(open('2grams.model', 'rb'))
+        [self.tgrams_index, self.tgrams_freq] = pickle.load(open('3grams.model', 'rb'))
     
     def init_corpus(self):
+        self.size = 20000
         self.corpus = []
+        self.corpus_map = {}
+        self.corpus_prob = []
         lines = open('corpus.txt').readlines()
         for i in range(20000):
             tags = lines[i].split(' ')
             word = tags[0]
-            pri = float(tags[1])
-            self.corpus.append([word, pri])
+            prob = float(tags[1])
+            self.corpus.append(word)
+            self.corpus_prob.append(prob)
+            self.corpus_map[word] = i
     
     def calc_letter_distribution(self, mode = LETTER_DISTRIBUTION_LAYOUT, **kwargs):
         if mode == self.LETTER_DISTRIBUTION_LAYOUT: # set letter distribution according to keyboard layout
@@ -84,9 +91,10 @@ class Simulation:
                         plt.scatter(xc, yc, color='red', s = 10)
                         ax.add_patch(ell)
 
-                    cov = np.cov(np.array([X,Y]))
-                    cov[0,0] = max(cov[0, 0], .01)
-                    cov[1,1] = max(cov[1, 1], .01)
+                    
+                    cov = np.array([[0.1, 0], [0, 0.1]])
+                    if len(X) >= 5:
+                        cov = np.cov(np.array([X,Y]))
                     std_x2 = cov[0, 0]
                     std_y2 = cov[1, 1]
                     std_xy = (std_x2 ** 0.5) * (std_y2 ** 0.5)
@@ -97,7 +105,7 @@ class Simulation:
             #plt.show()
     
     def get_feature(self, data): # get position from inputted data
-        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
+        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
         row = max(0-0.5,min(2+0.5,highlight_row - 1)) # Display setting
         col = max(0-0.5,min(1+0.5,highlight_col - 1))
         if side == 'L':
@@ -112,12 +120,11 @@ class Simulation:
                 col = 6 + (index - 1)
             
             col += 1
-            endpoint_x += 10
-        #return [col, row]
-        return [endpoint_x, endpoint_y]
+            endpoint_x += 11
+        return [corr_endpoint_x, highlight_row]
 
     def get_position(self, data):
-        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, frame_id] = data
+        [side, index, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
         row = int(round(max(0,min(2,highlight_row - 1))))
         col = int(round(max(0,min(1,highlight_col - 1))))
         if side == 'L':
@@ -132,7 +139,47 @@ class Simulation:
                 col = 6 + (index - 1)
         return [col, row]
 
-    def predict(self, data, truth):
+    def binary_search(self, arr, key):
+        st = 0
+        en = len(arr) - 1
+        while (st < en):
+            mid = (st + en + 1) // 2 # TODO: check
+            if key >= arr[mid]:
+                st = mid
+            else:
+                en = mid - 1
+        if arr[st] == key:
+            return st
+        else:
+            return -1
+
+    def get_corpus_prob(self, inputted):
+        words = inputted.split()
+        index = -1
+        if len(words) >= 3 and words[-3] in self.corpus_map and words[-2] in self.corpus_map: # Trigram
+            key = self.corpus_map[words[-3]] * self.size + self.corpus_map[words[-2]]
+            index = self.binary_search(self.tgrams_index[:,0], key)
+            ngrams_index = self.tgrams_index
+            ngrams_freq = self.tgrams_freq
+        if index == -1 and len(words) >= 2 and words[-2] in self.corpus_map: # Bigram
+            key = self.corpus_map[words[-2]]
+            index = self.binary_search(self.bgrams_index[:,0], key)
+            ngrams_index = self.bgrams_index
+            ngrams_freq = self.bgrams_freq
+        if index != -1:
+            st = ngrams_index[index, 1]
+            if index + 1 < ngrams_index.shape[0]:
+                en = ngrams_index[index + 1, 1]
+            else:
+                en = ngrams_freq.shape[0]
+            corpus_prob = np.zeros(self.size)
+            for i in range(st, en):
+                corpus_prob[ngrams_freq[i, 0]] = ngrams_freq[i, 1]
+            corpus_prob[corpus_prob == 0] = 1
+            return corpus_prob
+        return self.corpus_prob # Unigram
+
+    def predict(self, data, inputted, truth):
         features = [self.get_feature(tap) for tap in data]
         positions = [self.get_position(tap) for tap in data]
 
@@ -148,20 +195,23 @@ class Simulation:
                 assert(step_prob < 1)
                 P[i, index] = step_prob
 
+        corpus_prob = self.get_corpus_prob(inputted)
         max_prob = 0
         best_candidate = ''
         probs = []
-        for (candidate, prob) in self.corpus:
+        for i in range(len(self.corpus)):
+            candidate = self.corpus[i]
+            prob = corpus_prob[i]
             if len(candidate) == len(features):
                 for i in range(len(features)):
                     letter = candidate[i]
                     index = ord(letter) - ord('a')
 
-                    [xc, yc] = self.letter_positions[index]
-                    [x, y] = positions[i]
-                    if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
-                        prob = 0
-                        break
+                    #[xc, yc] = self.letter_positions[index]
+                    #[x, y] = positions[i]
+                    #if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
+                    #    prob = 0
+                    #    break
 
                     step_prob = P[i, index]
                     prob *= step_prob
@@ -186,7 +236,7 @@ class Simulation:
         if nums[0].isdigit():
             users = [int(nums[0])]
         else:
-            users = range(1, 13)
+            users = [1,2,3,4,5,6,8,9,10,12]#range(1, 13)
         if nums[1].isdigit():
             sessions = [int(nums[1])]
         else:
@@ -199,7 +249,7 @@ class Simulation:
 
         for user in users:
             for session in sessions:
-                folder_path = 'data/' + str(user) + '-' + str(session) + '/'
+                folder_path = 'data-study1/' + str(user) + '-' + str(session) + '/'
                 for i in range(N):
                     file_path = folder_path + str(i) + '.pickle'
                     if os.path.exists(file_path):
@@ -226,7 +276,7 @@ class Simulation:
                 enter = inputted[begin:end]
                 word_data = data[begin:end]
                 if enter == word:
-                    pred, rank = self.predict(word_data, word)
+                    pred, rank = self.predict(word_data, task[:end], word)
                     ranks.append(rank)
                     if pred != word:
                         # print('[Fail Cases]', word, pred)
@@ -247,23 +297,16 @@ class Simulation:
         pickle.dump([self, fail_cases], open('debug.pickle', 'wb'))
         return TOP_1
 
-class Debug:
-    def __init__(self):
-        pass
-
-    def run(self):
-        [sim, fail_cases] = pickle.load(open('debug.pickle', 'rb'))
-
-        for [word, data] in fail_cases:
-            plt.scatter(features[:,0], features[:,1])
-            plt.show()
-            pred, rank = sim.predict(data, word)
-            print(word, pred)
-
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print('[Usage] python tool_analysis.py folder_name(x-x)')
         exit()
+
+    # General
+    Simulation().run()
+    exit()
+
+    # Personaliztion
     if sys.argv[1] != 'x-x':
         Simulation().run()
     else:

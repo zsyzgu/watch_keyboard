@@ -38,7 +38,7 @@ class Decoder:
             [self.tgrams_index, self.tgrams_freq] = pickle.load(open('3grams.model', 'rb'))
 
     def get_finger(data):
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
         assert(side == 'L' or side == 'R')
         if side == 'L':
             return finger
@@ -46,14 +46,14 @@ class Decoder:
             return finger + 5
 
     def get_feature(data): # get position from inputted data
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
         if side == 'R':
-            endpoint_x += 10
-        return [endpoint_x, highlight_row]
+            endpoint_x += 11
+        return [corr_endpoint_x, highlight_row]
         #return [endpoint_x, endpoint_y]
 
     def get_position(data):
-        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y] = data[:8]
+        [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
         row = int(round(max(0,min(2,highlight_row - 1))))
         col = int(round(max(0,min(1,highlight_col - 1))))
         if side == 'L':
@@ -72,7 +72,7 @@ class Decoder:
         st = 0
         en = len(arr) - 1
         while (st < en):
-            mid = (st + en + 1) // 2 # TODO: check
+            mid = (st + en + 1) // 2
             if key >= arr[mid]:
                 st = mid
             else:
@@ -141,11 +141,11 @@ class Decoder:
                     letter = candidate[i]
                     alpha = ord(letter) - ord('a')
 
-                    [xc, yc] = self.positions[alpha]
-                    [x, y] = positions[i]
-                    if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
-                        prob = 0
-                        break
+                    #[xc, yc] = self.positions[alpha] # Exclude wrong input
+                    #[x, y] = positions[i]
+                    #if (x - xc) ** 2 + (y - yc) ** 2 >= 2.1 ** 2:
+                    #    prob = 0
+                    #    break
 
                     step_prob = P[i, alpha]
                     prob *= step_prob

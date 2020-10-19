@@ -12,6 +12,7 @@ import sys
 
 class Exp:
     def __init__(self):
+        pygame.mixer.init(22050, -16, 2, 64)
         pygame.init()
         self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_ALWAYS, WORD_CORRECTION=Keyboard.CORRECT_WORD)
         self.tracker_L = FingerTracker(1)
@@ -85,6 +86,11 @@ class Exp1(Exp):
             os.makedirs(save_folder + 'R/')
         self.frame_id = 0
 
+    def r(x):
+        if x == None:
+            return -1
+        return round(x)
+
     def update_hightlight(self):
         self.keyboard.L_row = self.tracker_L.highlight_row
         self.keyboard.L_col = self.tracker_L.highlight_col
@@ -92,7 +98,7 @@ class Exp1(Exp):
         self.keyboard.R_col = self.tracker_R.highlight_col
 
     def pack_input_data(self):
-        # [side, which_finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, image_L, image_R]
+        # [side, which_finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y, image_L, image_R]
         for i in range(5):
             tracker = None
             if self.tracker_L.is_touch_down[i]:
@@ -102,7 +108,7 @@ class Exp1(Exp):
                 side = 'R'
                 tracker = self.tracker_R
             if tracker != None:
-                return [side, i, tracker.highlight_row, tracker.highlight_col, time.clock(), tracker.palm_line, tracker.endpoints[i][0], tracker.endpoints[i][1], self.tracker_L.image.copy(), self.tracker_R.image.copy()]
+                return [side, i, tracker.highlight_row, tracker.highlight_col, time.clock(), tracker.palm_line, tracker.endpoints[i][0], tracker.endpoints[i][1], tracker.corr_endpoints[i][0], tracker.corr_endpoints[i][1], self.tracker_L.image.copy(), self.tracker_R.image.copy()]
         return []
 
     def save_data(self):
@@ -115,7 +121,7 @@ class Exp1(Exp):
             cv2.imwrite(self.save_folder + 'R/' + str(self.frame_id) + '.jpg', image_R)
             self.frame_id += 1
         save_file = open(self.save_folder + str(self.keyboard.curr_task_id) + '.pickle', 'wb')
-        pickle.dump([self.keyboard.task, self.keyboard.inputted_text, data], save_file)
+        pickle.dump([self.keyboard.task, self.keyboard.inputted_text, data, self.keyboard.inputted_space_cnt], save_file)
 
     def run(self):
         self.keyboard.draw()
@@ -141,26 +147,25 @@ class Exp1(Exp):
 
             if (len(input_data) > 0 and input_data[:2] == ['R', 0]) or pygame.K_SPACE in keys: # Enter a space (R - Thumb)
                 self.keyboard.enter_a_space(input_data)
-                end_time = time.clock()
             
             if (len(input_data) > 0 and input_data[1] >= 1): # Enter a letter (L/R - Index to Pinkie)
                 letter = calc_letter(self.keyboard, input_data)
                 if letter != '-':
-                    if self.keyboard.inputted_text == '':
-                        start_time = time.clock()
-                    else:
-                        end_time = time.clock()
                     self.keyboard.enter_a_letter(input_data, letter)
                 else:
                     self.keyboard.delete_a_letter()
             
             if (len(input_data) > 0 and input_data[:2] == ['L', 0]) or pygame.K_n in keys: # Next phrase (L - Thumb)
                 if len(self.keyboard.inputted_text) == len(self.keyboard.task):
-                    wpm = (len(self.keyboard.inputted_text)-1)/((end_time - start_time)/60.0)/5.0
+                    self.keyboard.enter_a_space(input_data) # Correct and show the last word
+                    self.keyboard.draw()
+                    start_time = float(self.keyboard.inputted_data[0][4])
+                    end_time = float(self.keyboard.inputted_data[-1][4])
+                    wpm = ((len(self.keyboard.inputted_text)-1)/5.0)/((end_time - start_time)/60.0)
                     print('WPM = ', wpm)
                     self.save_data()
                     is_running = self.keyboard.next_phrase()
-            
+
             if pygame.K_r in keys: # Redo phrase
                 self.keyboard.redo_phrase()
             if pygame.K_q in keys: # Quit

@@ -27,6 +27,7 @@ class Keyboard:
         self.init_corpus()
         self.init_inputted_data()
         self.init_display()
+        self.init_sound()
     
     def init_letter_info(self):
         self.decoder = Decoder()
@@ -78,9 +79,7 @@ class Keyboard:
                 self.corpus.append((word, pri))
 
     def init_inputted_data(self):
-        self.inputted_text = ''
-        self.inputted_data = []
-        self.last_touch_time = -1
+        self.redo_phrase()
 
     def init_display(self):
         self.screen = pygame.display.set_mode((10 * self.GRID + 1, 4 * self.GRID + 1))
@@ -89,6 +88,16 @@ class Keyboard:
         self.L_col = None
         self.R_row = None
         self.R_col = None
+
+    def init_sound(self):
+        self.sound_do = pygame.mixer.Sound("sound/do.wav")
+        self.sound_do.set_volume(0.2)
+        self.sound_re = pygame.mixer.Sound("sound/re.wav")
+        self.sound_re.set_volume(0.2)
+        self.sound_mi = pygame.mixer.Sound("sound/mi.wav")
+        self.sound_mi.set_volume(0.2)
+        self.sound_type = pygame.mixer.Sound("sound/type.wav")
+        self.sound_type.set_volume(1.0)
 
     def draw(self):
         GRID = self.GRID
@@ -145,8 +154,7 @@ class Keyboard:
     def next_phrase(self):
         self.curr_task_id += 1
         print('Phase = %d' % (self.curr_task_id))
-        self.inputted_text = ''
-        self.inputted_data = []
+        self.redo_phrase()
         if self.curr_task_id >= len(self.task_list):
             self.curr_task_id = 0
             return False
@@ -154,10 +162,13 @@ class Keyboard:
         return True
 
     def redo_phrase(self):
+        self.inputted_space_cnt = 0
         self.inputted_text = ''
         self.inputted_data = []
+        self.last_touch_time = -1
 
     def enter_a_letter(self, input_data, input_letter):
+        self.sound_type.play()
         i = len(self.inputted_text)
         letter = ''
         if i < len(self.task):
@@ -173,8 +184,9 @@ class Keyboard:
         return letter
 
     def enter_a_space(self, input_data):
+        self.sound_type.play()
         i = len(self.inputted_text)
-        if i == 0 or self.inputted_text[-1] == ' ':
+        if i == 0 or self.inputted_text[-1] == ' ': # can not enter two spaces
             return
         if self.WORD_CORRECTION == self.CORRECT_WORD:
             tags = self.inputted_text.split(' ')
@@ -184,13 +196,17 @@ class Keyboard:
                     tags[-1] = word
                 self.inputted_text = ' '.join(tags)
         if i < len(self.task):
+            self.inputted_space_cnt += 1
             self.inputted_text += ' '
             self.inputted_data.append(input_data)
     
     def delete_a_letter(self):
+        self.sound_type.play()
         if len(self.inputted_text) > 0:
             self.inputted_text = self.inputted_text[:-1]
             self.inputted_data = self.inputted_data[:-1]
+            if self.inputted_text == '':
+                self.inputted_space_cnt = 0
 
     def get_position(self, data): # get position from inputted data
         [side, index, highlight_row, highlight_col] = data[:4]
