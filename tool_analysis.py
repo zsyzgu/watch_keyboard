@@ -13,8 +13,8 @@ from finger_tracker import FingerTracker
 from decoder import Decoder
 
 class Simulation:
-    def __init__(self):
-        pass
+    def __init__(self, root_folder = 'data/'):
+        self.root_folder = root_folder
     
     def input(self):
         nums = sys.argv[1].split('-')
@@ -36,11 +36,10 @@ class Simulation:
 
         for user in users:
             for session in sessions:
-                folder_path = 'data-baseline/' + str(user) + '-' + str(session) + '/'
+                folder_path = self.root_folder + str(user) + '-' + str(session) + '/'
                 for i in range(N):
                     file_path = folder_path + str(i) + '.pickle'
                     if os.path.exists(file_path):
-                        print(file_path)
                         [task, inputted, data, space_cnt] = pickle.load(open(file_path, 'rb'))
                         assert(len(inputted) == len(data) and len(data) == len(data))
                         task_list.append(task)
@@ -52,6 +51,8 @@ class Simulation:
 
     def run(self):
         task_list, inputted_list, data_list, space_cnt_list = self.input()
+        if len(task_list) == 0:
+            return
 
         wpm_word_cnt = 0
         word_cnt = 0
@@ -85,7 +86,8 @@ if __name__ == "__main__":
         print('[Usage] python tool_analysis.py folder_name(x-x)')
         exit()
 
-    users = [1]
+    users = range(1,13)
     for user in users:
         sys.argv[1] = str(user) + '-x'
         Simulation().run()
+        #Simulation('data-baseline/').run()

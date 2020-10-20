@@ -159,28 +159,23 @@ def calc(camera_id, frames):
                     Y.append(y)
                             
             n_std = 3
+            xc, x_std = np.mean(X), np.std(X)
+            yc, y_std = np.mean(Y), np.std(Y)
+            pack = zip(X.copy(), Y.copy())
+            X = []
+            Y = []
+            for x, y in pack:
+                if abs(x-xc) <= n_std * x_std and abs(y-yc) <= n_std * y_std:
+                    X.append(x)
+                    Y.append(y)
+
             X = np.array(X)
             Y = np.array(Y)
             assert(len(X) > 0)
             print('R = %d, C = %d, NUM = %d' % (r,c,len(X)))
             (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
             xc, yc = center
-            ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
-
-            '''
-            new_X = [] # Remove bad points & calc once more
-            new_Y = []
-            for i in range(len(X)):
-                x, y = X[i], Y[i]
-                if ell.contains_point([x,y]):
-                    new_X.append(x)
-                    new_Y.append(y)
-            X = new_X
-            Y = new_Y
-            (center, a, b, theta) = fit_bivariate_normal(X, Y, robust=True)
-            xc, yc = center
-            ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')
-            '''
+            ell = Ellipse(center, a * n_std, b * n_std, (theta * 180. / np.pi), ec='k', fc='none', color='red')            
 
             index = r * 5 + c + 1
             plt.scatter(X, Y, color=('C'+str(index)), s = 5)
