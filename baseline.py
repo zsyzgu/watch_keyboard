@@ -1,16 +1,31 @@
 import pygame
 import time
 from keyboard import Keyboard
+import sys
+import os
+import pickle
 
 class Baseline:
     def __init__(self):
         pygame.mixer.init(22050, -16, 2, 64)
         pygame.init()
         self.keyboard = Keyboard(VISABLE_FEEDBACK=Keyboard.VISABLE_NO, WORD_CORRECTION=Keyboard.CORRECT_WORD)
+        self.frame_id = 0
+        self.save_folder = save_folder = 'data-baseline/' + sys.argv[1] + '/'
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+        else:
+            print('\033[1;31;40m[Warning]\033[0m Folder exists')
 
     def save_data(self):
-        pass
-        # TODO
+        data = self.keyboard.inputted_data
+        for i in range(len(data)):
+            image_L = data[i][-2]
+            image_R = data[i][-1]
+            data[i] = data[i][:-2] + [self.frame_id]
+            self.frame_id += 1
+        save_file = open(self.save_folder + str(self.keyboard.curr_task_id) + '.pickle', 'wb')
+        pickle.dump([self.keyboard.task, self.keyboard.inputted_text, data, self.keyboard.inputted_space_cnt], save_file)
 
     def run(self):
         self.keyboard.draw()
@@ -83,4 +98,8 @@ class Baseline:
             
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print('[Usage] python baseline.py save_folder')
+        exit()
+
     Baseline().run()

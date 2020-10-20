@@ -7,7 +7,7 @@ __pycache__/
 /raw
 /test
 /data
+/data-baseline
 /data-study1
-/original_data
 /sound
 debug.pickle

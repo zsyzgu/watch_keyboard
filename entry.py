@@ -71,7 +71,7 @@ def calc_letter(keyboard, input_data):
 
     return '#'
 
-class Exp1(Exp):
+class Entry(Exp):
     def __init__(self):
         super().__init__()
 
@@ -85,11 +85,6 @@ class Exp1(Exp):
         if not os.path.exists(save_folder + 'R/'):
             os.makedirs(save_folder + 'R/')
         self.frame_id = 0
-
-    def r(x):
-        if x == None:
-            return -1
-        return round(x)
 
     def update_hightlight(self):
         self.keyboard.L_row = self.tracker_L.highlight_row
@@ -177,5 +172,5 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print('[Usage] python entry.py save_folder')
         exit()
-    exp = Exp1()
-    exp.run()
+    
+    Entry().run()

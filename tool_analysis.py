@@ -36,10 +36,11 @@ class Simulation:
 
         for user in users:
             for session in sessions:
-                folder_path = 'data/' + str(user) + '-' + str(session) + '/'
+                folder_path = 'data-baseline/' + str(user) + '-' + str(session) + '/'
                 for i in range(N):
                     file_path = folder_path + str(i) + '.pickle'
                     if os.path.exists(file_path):
+                        print(file_path)
                         [task, inputted, data, space_cnt] = pickle.load(open(file_path, 'rb'))
                         assert(len(inputted) == len(data) and len(data) == len(data))
                         task_list.append(task)
