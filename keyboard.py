@@ -24,35 +24,21 @@ class Keyboard:
         self.WORD_CORRECTION = WORD_CORRECTION
         self.init_letter_info()
         self.init_task_list('phrases.txt')
-        self.init_corpus()
+        self.init_decoder()
         self.init_inputted_data()
         self.init_display()
         self.init_sound()
     
     def init_letter_info(self):
-        self.decoder = Decoder()
-        
-        FINGER_PINKIE = 'QAZ|P'
-        FINGER_RING = 'WSX|OL'
-        FINGER_MIDDLE = 'EDC|IK'
-        FINGER_INDEX_L = 'RFV|TGB'
-        FINGER_INDEX_R = 'YHN|UJM'
-        self.letter_colors = [(0,0,0) for i in range(26)]
-        for index in range(26):
-            ch = chr(index + ord('A'))
-            color = (0,0,0)
-            I = 64
-            if ch in FINGER_PINKIE:
-                color = (0,I,0)
-            elif ch in FINGER_RING:
-                color = (I,0,I)
-            elif ch in FINGER_MIDDLE:
-                color = (I,I,0)
-            elif ch in FINGER_INDEX_L:
-                color = (0,I,I)
-            elif ch in FINGER_INDEX_R:
-                color = (0,0,I)
-            self.letter_colors[index] = color
+        FINGERS = ['QAZ|P', 'WSX|OL', 'EDC|IK', 'RFV|TGB', 'YHN|UJM']
+        COLORS = [(0,64,0), (64,0,64), (64,64,0), (0,64,64), (0,0,64)]
+        self.letter_colors = []
+        for alpha in range(26):
+            ch = chr(alpha + ord('A'))
+            for (finger, color) in zip(FINGERS, COLORS):
+                if ch in finger:
+                    self.letter_colors.append(color)
+                    break
 
     def init_task_list(self, path):
         self.task_list = []
@@ -67,16 +53,8 @@ class Keyboard:
         self.task_list = self.task_list[:self.TASK_NUM]
         self.task = self.task_list[self.curr_task_id]
 
-    def init_corpus(self):
-        if self.WORD_CORRECTION:
-            self.corpus = []
-            lines = open('corpus.txt').readlines()
-            for i in range(self.CORPUS_NUM):
-                line = lines[i]
-                tags = line.strip().split(' ')
-                word = tags[0]
-                pri = float(tags[1])
-                self.corpus.append((word, pri))
+    def init_decoder(self):
+        self.decoder = Decoder()
 
     def init_inputted_data(self):
         self.redo_phrase()
