@@ -20,8 +20,6 @@ class Baseline:
     def save_data(self):
         data = self.keyboard.inputted_data
         for i in range(len(data)):
-            image_L = data[i][-2]
-            image_R = data[i][-1]
             data[i] = data[i][:-2] + [self.frame_id]
             self.frame_id += 1
         save_file = open(self.save_folder + str(self.keyboard.curr_task_id) + '.pickle', 'wb')

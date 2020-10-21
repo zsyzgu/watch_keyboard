@@ -31,7 +31,6 @@ class FingerTracker: # 1280 * 960
         self.fingertips = [[-1, -1]] * 5
     
     def init_touch(self):
-        self.THUMB_DELTA = 60 # The touching thumb is THUMB_DELTA pixels lower than camera_cy
         self.MIN_ENDPOINT_BRIGHTNESS = 0.7 # The endpoint should be bright enough when contacting
         self.is_touch = [False for i in range(5)]
         self.is_touch_down = [False for i in range(5)]
@@ -41,7 +40,7 @@ class FingerTracker: # 1280 * 960
         assert(camera_id == 1 or camera_id == 2)
         self.camera_id = camera_id
         self.N, self.M = 960, 1280
-        [self.map1, self.map2, self.roi, self.camera_mtx] = pickle.load(open(str(camera_id) + '.calib', 'rb'))
+        [self.map1, self.map2, self.roi, self.camera_mtx] = pickle.load(open('models/' + str(camera_id) + '.calib', 'rb'))
         self.camera_H = 0.75
         self.fx = self.camera_mtx[0][0]
         self.fy = self.camera_mtx[1][1]
@@ -60,7 +59,7 @@ class FingerTracker: # 1280 * 960
         self.palm_line_dy = 0
     
     def init_highlight(self, camera_id):
-        pc = pickle.load(open(str(camera_id) + '.regist', 'rb'))
+        pc = pickle.load(open('models/' + str(camera_id) + '.regist', 'rb'))
         self.row_position = [np.mean(pc[r,:,1]) for r in range(3)]
         self.col_position = [np.mean(pc[:,c,0]) for c in range(5)]
         self.highlight_col = None
@@ -97,22 +96,6 @@ class FingerTracker: # 1280 * 960
             if self.camera_id == 2:
                 return 55
 
-    def erode_fingers(self, image, brightness_threshold):
-        kernel = np.uint8(np. ones((1, 3)))
-
-        sob1 = cv2.Sobel(image, -1, 1, 0, ksize=-1)
-        r1 = cv2.subtract(image, sob1)
-        _, r1 = cv2.threshold(r1, brightness_threshold, 255, type=cv2.THRESH_TOZERO)
-        r1 = cv2.erode(r1, kernel, iterations=4)
-
-        sob2 = cv2.flip(cv2.Sobel(cv2.flip(image, 1), -1, 1, 0, ksize=-1), 1)
-        r2 = cv2.subtract(image, sob2)
-        _, r2 = cv2.threshold(r2, brightness_threshold, 255, type=cv2.THRESH_TOZERO)
-        r2 = cv2.erode(r2, kernel, iterations=4)
-
-        r = cv2.max(r1,r2)
-        return r
-
     def find_fingertips(self, contours):
         fingers = self.find_fingers(contours)
         if len(fingers) == 0:
@@ -121,7 +104,6 @@ class FingerTracker: # 1280 * 960
         fingertips = []
         self.has_thumb = False
         self.save_finger_contour = {}
-        small_chunk = np.min([len(finger) for finger in fingers]) # The thumb can only on the smallest chunk
 
         for finger in fingers:
             l = np.argmin(finger[:,0])
@@ -269,9 +251,6 @@ class FingerTracker: # 1280 * 960
         self.is_touch_down = [False for i in range(5)]
         self.is_touch_up = [False for i in range(5)]
         
-        #if self.fingertips[0][0] != -1: # The thumb
-        #    x, y = self.fingertips[0][0], self.fingertips[0][1]
-        #    self.is_touch[0] = (y >= self.cy + self.THUMB_DELTA)
         if len(touch_line) > 0:
             for i in range(0, 5): # Not the thumb
                 if self.fingertips[i][0] != -1:

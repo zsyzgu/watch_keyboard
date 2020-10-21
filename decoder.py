@@ -17,7 +17,7 @@ class Decoder:
         self.init_language_model()
     
     def init_touch_model(self):
-        [self.positions, self.fingers, self.distributions] = pickle.load(open('touch.model', 'rb'))
+        [self.positions, self.fingers, self.distributions] = pickle.load(open('models/touch.model', 'rb'))
 
     def init_language_model(self):
         self.size = 20000
@@ -34,8 +34,8 @@ class Decoder:
             self.corpus_map[word] = i
 
         if self.is_tgrams:
-            [self.bgrams_index, self.bgrams_freq] = pickle.load(open('2grams.model', 'rb'))
-            [self.tgrams_index, self.tgrams_freq] = pickle.load(open('3grams.model', 'rb'))
+            [self.bgrams_index, self.bgrams_freq] = pickle.load(open('models/2grams.model', 'rb'))
+            [self.tgrams_index, self.tgrams_freq] = pickle.load(open('models/3grams.model', 'rb'))
 
     def get_finger(data):
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
@@ -47,10 +47,7 @@ class Decoder:
 
     def get_feature(data): # get position from inputted data
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
-        if side == 'R':
-            endpoint_x += 11
         return [corr_endpoint_x, highlight_row]
-        #return [endpoint_x, endpoint_y]
 
     def get_position(data):
         [side, finger, highlight_row, highlight_col, timestamp, palm_line, endpoint_x, endpoint_y, corr_endpoint_x, corr_endpoint_y] = data[:10]
@@ -102,10 +99,9 @@ class Decoder:
                     en = ngrams_index[index + 1, 1]
                 else:
                     en = ngrams_freq.shape[0]
-                corpus_prob = np.zeros(self.size)
+                corpus_prob = np.ones(self.size)
                 for i in range(st, en):
                     corpus_prob[ngrams_freq[i, 0]] = ngrams_freq[i, 1]
-                corpus_prob[corpus_prob == 0] = 1
                 return corpus_prob
         return self.corpus_prob # Unigram
 
@@ -125,7 +121,7 @@ class Decoder:
                 z = (dx ** 2) / std_x2 - (2 * p * dx * dy) / std_xy + (dy ** 2) / std_y2
                 step_prob = self.fingers[alpha][finger]
                 step_prob *= (.001 / (std_xy * ((1 - p ** 2) ** 0.5))) * math.exp(-z / (2 * (1 - p ** 2))) # the constant is modified to be small (1/2pi --> .01) so that prob<1
-                assert(step_prob < 1)
+                # assert(step_prob < 1)
                 P[i, alpha] = step_prob
 
         corpus_prob = self.get_corpus_prob(inputted)

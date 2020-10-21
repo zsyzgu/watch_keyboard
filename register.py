@@ -3,7 +3,6 @@ import cv2
 from finger_tracker import FingerTracker
 import time
 import pickle
-import img2video
 import os
 import matplotlib.pyplot as plt
 import pickle
@@ -185,7 +184,7 @@ def calc(camera_id, frames):
             pc[r,c] = [xc, yc, a, b, theta]
 
     plt.show()    
-    pickle.dump(pc, open(str(camera_id) + '.regist', 'wb'))
+    pickle.dump(pc, open('models/' + str(camera_id) + '.regist', 'wb'))
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -195,5 +194,5 @@ if __name__ == "__main__":
     assert(1 <= camera_id and camera_id <= 2)
     frames = record(camera_id)
     #frames = pickle.load(open('debug.pickle','rb'))
-    pickle.dump(frames,open('debug.pickle','wb'))
+    #pickle.dump(frames,open('debug.pickle','wb'))
     calc(camera_id, frames)

@@ -3,14 +3,9 @@ import matplotlib.pyplot as plt
 from finger_tracker import FingerTracker
 import time
 import pickle
-import img2video
 import cv2
 
 if __name__ == "__main__":
-    #[map1,map2,roi,mtx] = pickle.load(open('2.calib','rb'))
-    #print(mtx)
-    #exit()
-
     camera = cv2.VideoCapture(1)
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 960)

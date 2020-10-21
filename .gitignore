@@ -10,4 +10,6 @@ __pycache__/
 /data-baseline
 /data-study1
 /sound
+/models
 debug.pickle
+corpus.txt

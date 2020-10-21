@@ -50,6 +50,7 @@ class Simulation:
                     alpha = ord(letter) - ord('a')
                     feature = Decoder.get_feature(data[i])
                     finger = Decoder.get_finger(data[i])
+                    # finger = 0 # If not using fingering model
                     features[alpha][finger].append(feature)
         
         for alpha in range(26):
@@ -98,7 +99,7 @@ class Simulation:
                     self.letter_fingers[alpha][finger] = max(self.letter_fingers[alpha][finger], 0.001)
         
         #plt.show()
-        pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('touch.model', 'wb'))
+        pickle.dump([self.letter_positions, self.letter_fingers, self.letter_distributions], open('models/touch.model', 'wb'))
         self.decoder = Decoder()
     
     def input(self):
@@ -137,7 +138,6 @@ class Simulation:
         self.calc_letter_distribution(data_list=data_list, task_list=task_list)
 
         ranks = []
-        fail_cases = []
         for task, inputted, data in zip(task_list, inputted_list, data_list):
             words = task.split()
             begin = 0
@@ -149,9 +149,6 @@ class Simulation:
                 if enter == word:
                     pred, rank = self.decoder.predict(word_data, task[:end], word)
                     ranks.append(rank)
-                    if pred != word and rank != -1:
-                        #print('[Fail Cases]', word, pred, rank)
-                        fail_cases.append([word, word_data])
 
                 begin = end + 1
 
@@ -165,7 +162,6 @@ class Simulation:
             if i == 0:
                 TOP_1 = prob
         
-        pickle.dump([self, fail_cases], open('debug.pickle', 'wb'))
         return TOP_1
 
 if __name__ == "__main__":

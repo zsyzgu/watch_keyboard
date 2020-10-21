@@ -9,6 +9,7 @@ from keyboard import Keyboard
 from finger_tracker import FingerTracker
 import pickle
 import sys
+from decoder import Decoder
 
 class Exp:
     def __init__(self):
@@ -43,19 +44,7 @@ class Exp:
         return keys
 
 def calc_letter(keyboard, input_data):
-    [side, index, highlight_row, highlight_col] = input_data[:4]
-    row = int(round(max(0,min(2,highlight_row - 1))))
-    col = int(round(max(0,min(1,highlight_col - 1))))
-    if side == 'L':
-        if index == 1:
-            col = 3 + col
-        else:
-            col = 3 - (index - 1)
-    if side == 'R':
-        if index == 1:
-            col = 6 - col
-        else:
-            col = 6 + (index - 1)
+    [col, row] = Decoder.get_position(input_data)
     
     for i in range(26):
         [c, r] = keyboard.decoder.positions[i]
@@ -129,7 +118,7 @@ class Entry(Exp):
             self.tracker_L.run(image_L)
             self.tracker_R.run(image_R)
 
-            if True:
+            if False:
                 output_L = self.tracker_L.output()
                 output_R = self.tracker_R.output()
                 output = np.hstack([output_L, output_R])
