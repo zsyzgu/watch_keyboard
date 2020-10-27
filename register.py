@@ -113,6 +113,10 @@ def record(camera_id):
             break
         tracker.run(frame)
         output = tracker.output(str(index))
+        if False:
+            output[20,:] = 100
+            output[50,:] = 100
+            output[80,:] = 100
         cv2.imshow('illustration', output)
         cv2.waitKey(1)
 

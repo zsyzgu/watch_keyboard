@@ -118,7 +118,7 @@ class Entry(Exp):
             self.tracker_L.run(image_L)
             self.tracker_R.run(image_R)
 
-            if False:
+            if True:
                 output_L = self.tracker_L.output()
                 output_R = self.tracker_R.output()
                 output = np.hstack([output_L, output_R])

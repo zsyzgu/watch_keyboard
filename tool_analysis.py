@@ -74,7 +74,6 @@ class Simulation:
             minute_cnt += (float(data[-1][4]) - float(data[0][4])) / 60
             word_cnt += len(words)
             inputted_word_cnt += space_cnt + 1
-            break
         
         wpm = wpm_word_cnt / minute_cnt
         uer = 1 - float(correct_word_cnt) / word_cnt

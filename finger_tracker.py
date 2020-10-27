@@ -23,7 +23,7 @@ class FingerTracker: # 1280 * 960
     def init_fingertips(self):
         self.TIP_HEIGHT = 10 # Deal with two recognized points on a fingertip
         self.TIP_MAX_WIDTH = 180 # Max/Min width of a tip (excluding thumb)
-        self.TIP_MIN_WIDTH = 15
+        self.TIP_MIN_WIDTH = 20
         self.THUMB_MAX_WIDTH = 300 # Max/Min width of a thumb
         self.THUMB_MIN_WIDTH = 50
         self.MOVEMENT_THRESHOLD = 80 # The maximun moving pixels of a fintertip in one frame
@@ -92,9 +92,9 @@ class FingerTracker: # 1280 * 960
     def find_brightness_threshold(self):
         if self.FIXED_BRIGHTNESS:
             if self.camera_id == 1:
-                return 55
+                return 60
             if self.camera_id == 2:
-                return 55
+                return 60
 
     def find_fingertips(self, contours):
         fingers = self.find_fingers(contours)
@@ -371,11 +371,6 @@ class FingerTracker: # 1280 * 960
         if col != None:
             self.highlight_col = col = max(0.5, min(3.5, col))
 
-    def erode_and_dilate(self, image, iteration, kernel=np.ones((3,3),np.uint8)):
-        image = cv2.erode(image, kernel, iterations=iteration)
-        image = cv2.dilate(image, kernel, iterations=iteration)
-        return image
-
     def run(self, image):
         assert(self.N == image.shape[0] and self.M == image.shape[1])
         self.image = image
@@ -383,11 +378,11 @@ class FingerTracker: # 1280 * 960
         gray = cv2.multiply(gray, self.intensity_mask, dtype=cv2.CV_8U) # Light up the two sides of the image
         brightness_threshold = self.find_brightness_threshold()
         _, gray = cv2.threshold(gray, brightness_threshold, 255, type=cv2.THRESH_TOZERO)
-        gray = self.erode_and_dilate(gray, 4)
+        gray = cv2.morphologyEx(gray, cv2.MORPH_OPEN, np.ones((3,3),np.uint8), iterations=4)
 
         contours = self.find_contours(gray, brightness_threshold)
         table_contour = self.find_table(contours)
-        
+
         touch_line = []
         if len(table_contour) != 0:
             if np.min(table_contour[:, :, 1]) <= self.PALM_THRESHOLD: # Table connect with fingers
@@ -395,11 +390,11 @@ class FingerTracker: # 1280 * 960
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED)
             else:
                 cv2.drawContours(gray, [table_contour], -1, 0, cv2.FILLED) # There is a table, but not connect with fingers
-        
+
         kernel = np.array([[4, 2, 1, -4, -6, -4, 1, 2, 4]]) # Remove the crevices between fingers
         eroded_gray = gray[:int(self.cy)+150,:]
         crevice = cv2.filter2D(eroded_gray, -1, kernel)
-        crevice = self.erode_and_dilate(crevice, 3, kernel=np.array([[1],[1],[1]]))
+        crevice = cv2.morphologyEx(crevice, cv2.MORPH_OPEN, kernel=np.array([[1],[1],[1]]), iterations=3)
         eroded_gray = cv2.subtract(eroded_gray, crevice)
         contours = self.find_contours(eroded_gray, brightness_threshold)
 
