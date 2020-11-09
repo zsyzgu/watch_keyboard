@@ -4,7 +4,7 @@ import cv2
 def input():
     frames = []
 
-    for i in range(1):
+    for i in range(1,2):
         file_name = './data/1-1/L/' + str(i) + '.jpg'
         frame = cv2.imread(file_name)
         frames.append(frame)

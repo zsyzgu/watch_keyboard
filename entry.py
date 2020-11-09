@@ -9,6 +9,7 @@ from keyboard import Keyboard
 from finger_tracker import FingerTracker
 import pickle
 import sys
+import threading
 from decoder import Decoder
 
 class Exp:
@@ -107,17 +108,25 @@ class Entry(Exp):
         save_file = open(self.save_folder + str(self.keyboard.curr_task_id) + '.pickle', 'wb')
         pickle.dump([self.keyboard.task, self.keyboard.inputted_text, data, self.keyboard.inputted_space_cnt], save_file)
 
+    def track(self, tracker, camera):
+        succ, frame = camera.read()
+        if succ == False:
+            print('Camera Error')
+            exit()
+        tracker.run(frame)
+
     def run(self):
         self.keyboard.draw()
 
         is_running = True
         while is_running:
-            succ, image_L, image_R = self.acquire_frame()
-            if not succ:
-                break
-            self.tracker_L.run(image_L)
-            self.tracker_R.run(image_R)
-
+            t1 = threading.Thread(target=self.track, args=(self.tracker_L, self.camera_L, ))
+            t2 = threading.Thread(target=self.track, args=(self.tracker_R, self.camera_R, ))
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
+            
             if True:
                 output_L = self.tracker_L.output()
                 output_R = self.tracker_R.output()
